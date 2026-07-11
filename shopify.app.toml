@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "b84ccae02a1278facc4b5cf15c318e92"
+client_id = "358a8b6e21a6099b9a021d128363e6b0"
 name = "discount-tiers"
 application_url = "https://tiered-discount-wy5b.onrender.com"
 embedded = true
