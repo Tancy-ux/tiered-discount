@@ -1,0 +1,4 @@
+{
+  "name": "Tiered order discount",
+  "description": "Applies a tiered percentage discount to the order subtotal based on cart value. Attach any discount code to this function to give it the tiered logic automatically."
+}

@@ -1,0 +1,24 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "t:name"
+handle = "tiered-order-discount"
+type = "function"
+uid = "c8069590-1c6f-697a-45f0-96f501b0f843cc52687a"
+description = "t:description"
+# NOTE: `uid` is generated automatically by the Shopify CLI the first time
+# you run `shopify app generate extension` / `shopify app deploy`.
+# Do not hand-write one — let the CLI add it here on first deploy.
+
+[[extensions.targeting]]
+target = "cart.lines.discounts.generate.run"
+input_query = "src/cart_lines_discounts_generate_run.graphql"
+export = "cart-lines-discounts-generate-run"
+
+[extensions.build]
+command = ""
+path = "dist/function.wasm"
+
+[extensions.ui.paths]
+create = "/app/discount/:functionId/new"
+details = "/app/discount/:functionId/:id"

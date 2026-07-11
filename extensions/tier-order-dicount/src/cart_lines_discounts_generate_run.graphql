@@ -1,0 +1,20 @@
+query CartLinesDiscountsGenerateRunInput {
+  discount {
+    discountClasses
+  }
+  cart {
+    cost {
+      subtotalAmount {
+        amount
+      }
+    }
+  }
+  shop {
+    # Shop-level metafield holding the configurable tier thresholds/percentages.
+    # Merchants can edit this from Shopify admin → Settings → Custom data → Shop
+    # (or via the metafieldsSet mutation) without any redeploy.
+    metafield(namespace: "tiered_discount", key: "config") {
+      value
+    }
+  }
+}
