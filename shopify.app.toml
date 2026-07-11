@@ -44,17 +44,10 @@ api_version = "2026-10"
   uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
 
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/customers/data_request"
-  topics = [ "customers/data_request" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/customers/redact"
-  topics = [ "customers/redact" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/shop/redact"
-  topics = [ "shop/redact" ]
+  [webhooks.privacy_compliance]
+  customer_data_request_url = "https://tiered-discount-wy5b.onrender.com/webhooks/customers/data_request"
+  customer_deletion_url = "https://tiered-discount-wy5b.onrender.com/webhooks/customers/redact"
+  shop_deletion_url = "https://tiered-discount-wy5b.onrender.com/webhooks/shop/redact"
 
 [auth]
 redirect_urls = [ "https://tiered-discount-wy5b.onrender.com/api/auth" ]
