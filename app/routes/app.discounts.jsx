@@ -1,4 +1,5 @@
 import { useLoaderData } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 
@@ -68,6 +69,16 @@ export const loader = async ({ request }) => {
 
 export default function Discounts() {
   const { codes, functionId } = useLoaderData();
+  const shopify = useAppBridge();
+
+  const handleCopy = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      shopify.toast.show("Code copied");
+    } catch {
+      shopify.toast.show("Couldn't copy code", { isError: true });
+    }
+  };
 
   return (
     <s-page heading="Discount codes">
@@ -93,13 +104,22 @@ export default function Discounts() {
               {codes.map((row) => (
                 <s-table-row key={row.id}>
                   <s-table-cell>
-                    {functionId ? (
-                      <s-link href={`/app/discount/${functionId}/${row.id}`}>
-                        {row.code}
-                      </s-link>
-                    ) : (
-                      row.code
-                    )}
+                    <s-stack direction="inline" gap="small-300" alignItems="center">
+                      {functionId ? (
+                        <s-link href={`/app/discount/${functionId}/${row.id}`}>
+                          {row.code}
+                        </s-link>
+                      ) : (
+                        row.code
+                      )}
+                      <s-button
+                        variant="tertiary"
+                        onClick={() => handleCopy(row.code)}
+                        accessibilityLabel={`Copy ${row.code}`}
+                      >
+                        📋
+                      </s-button>
+                    </s-stack>
                   </s-table-cell>
                   <s-table-cell>{row.customerName}</s-table-cell>
                   <s-table-cell>{row.status}</s-table-cell>

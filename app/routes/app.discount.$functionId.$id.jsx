@@ -288,6 +288,15 @@ export default function DiscountDetail() {
     );
   }
 
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      shopify.toast.show("Code copied");
+    } catch {
+      shopify.toast.show("Couldn't copy code", { isError: true });
+    }
+  };
+
   const handleSaveDetail = () => {
     if (!customer || !code.trim() || isSavingDetail) return;
     detailFetcher.submit(
@@ -360,11 +369,16 @@ export default function DiscountDetail() {
       <s-section heading="Discount details">
         <s-stack direction="block" gap="base">
           <CustomerPicker value={customer} onChange={setCustomer} />
-          <s-text-field
-            label="Code"
-            value={code}
-            onInput={(event) => setCode(event.currentTarget.value.toUpperCase())}
-          ></s-text-field>
+          <s-stack direction="inline" gap="small-300" alignItems="end">
+            <s-text-field
+              label="Code"
+              value={code}
+              onInput={(event) => setCode(event.currentTarget.value.toUpperCase())}
+            ></s-text-field>
+            <s-button variant="tertiary" onClick={handleCopyCode} accessibilityLabel="Copy code">
+              📋
+            </s-button>
+          </s-stack>
         </s-stack>
       </s-section>
 

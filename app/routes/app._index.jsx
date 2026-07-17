@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -11,6 +11,10 @@ function suggestCode(displayName) {
   const firstName = (displayName ?? "").trim().split(/\s+/)[0] ?? "";
   const cleaned = firstName.replace(/[^a-zA-Z]/g, "").toUpperCase();
   return cleaned ? `WARE-${cleaned}` : "";
+}
+
+function legacyId(gid) {
+  return gid.split("/").pop();
 }
 
 export const loader = async ({ request }) => {
@@ -29,6 +33,12 @@ export const loader = async ({ request }) => {
             }
           }
         }
+        shopifyFunctions(first: 25) {
+          nodes {
+            id
+            title
+          }
+        }
       }`,
   );
   const { data } = await response.json();
@@ -37,10 +47,15 @@ export const loader = async ({ request }) => {
     (node) => node.discount.__typename === "DiscountCodeApp",
   );
 
+  const tieredFunction =
+    data.shopifyFunctions.nodes.find((node) => node.title === "Tiered order discount") ??
+    data.shopifyFunctions.nodes[0];
+
   return {
     totalCodes: codes.length,
     activeCodes: codes.filter((node) => node.discount.status === "ACTIVE")
       .length,
+    functionId: tieredFunction ? legacyId(tieredFunction.id) : null,
   };
 };
 
@@ -60,6 +75,7 @@ export const action = async ({ request }) => {
       mutation CreateCustomerCode($discount: DiscountCodeAppInput!) {
         discountCodeAppCreate(codeAppDiscount: $discount) {
           codeAppDiscount {
+            id
             title
           }
           userErrors {
@@ -93,13 +109,18 @@ export const action = async ({ request }) => {
     return { ok: false, error: userErrors.map((e) => e.message).join(" ") };
   }
 
-  return { ok: true, title: data.discountCodeAppCreate.codeAppDiscount.title };
+  return {
+    ok: true,
+    id: legacyId(data.discountCodeAppCreate.codeAppDiscount.id),
+    title: data.discountCodeAppCreate.codeAppDiscount.title,
+  };
 };
 
 export default function Home() {
-  const { totalCodes, activeCodes } = useLoaderData();
+  const { totalCodes, activeCodes, functionId } = useLoaderData();
   const createFetcher = useFetcher();
   const shopify = useAppBridge();
+  const navigate = useNavigate();
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [code, setCode] = useState("");
@@ -109,10 +130,14 @@ export default function Home() {
   useEffect(() => {
     if (createFetcher.data?.ok) {
       shopify.toast.show("Discount code created");
-      setCode("");
-      setSelectedCustomer(null);
+      if (functionId && createFetcher.data.id) {
+        navigate(`/app/discount/${functionId}/${createFetcher.data.id}`);
+      } else {
+        setCode("");
+        setSelectedCustomer(null);
+      }
     }
-  }, [createFetcher.data, shopify]);
+  }, [createFetcher.data, shopify, functionId, navigate]);
 
   const handleSelectCustomer = (customer) => {
     setSelectedCustomer(customer);
