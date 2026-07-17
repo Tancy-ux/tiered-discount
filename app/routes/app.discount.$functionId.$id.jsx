@@ -48,6 +48,9 @@ export const loader = async ({ params, request }) => {
                   customers {
                     id
                     displayName
+                    defaultEmailAddress {
+                      emailAddress
+                    }
                   }
                 }
               }
@@ -70,6 +73,15 @@ export const loader = async ({ params, request }) => {
   if (!discount || discount.__typename !== "DiscountCodeApp") {
     return { notFound: true };
   }
+
+  const rawCustomer = discount.context?.customers?.[0] ?? null;
+  const customer = rawCustomer
+    ? {
+        id: rawCustomer.id,
+        displayName: rawCustomer.displayName,
+        email: rawCustomer.defaultEmailAddress?.emailAddress ?? null,
+      }
+    : null;
 
   let tiers = DEFAULT_TIERS;
   const metafield = data.shop.metafield;
@@ -94,7 +106,7 @@ export const loader = async ({ params, request }) => {
     endsAt: discount.endsAt,
     usageLimit: discount.usageLimit,
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
-    customer: discount.context?.customers?.[0] ?? null,
+    customer,
     tiers,
     shopId: data.shop.id,
   };
@@ -145,22 +157,32 @@ export const action = async ({ params, request }) => {
     const { data } = await response.json();
     const userErrors = data?.metafieldsSet?.userErrors ?? [];
     if (userErrors.length > 0) {
-      return { ok: false, intent, error: userErrors.map((e) => e.message).join(" ") };
+      return {
+        ok: false,
+        intent,
+        error: userErrors.map((e) => e.message).join(" "),
+      };
     }
     return { ok: true, intent };
   }
 
   const code = formData.get("code")?.toString().trim() ?? "";
   const customerId = formData.get("customerId")?.toString().trim() ?? "";
-  const previousCustomerId = formData.get("previousCustomerId")?.toString().trim() ?? "";
+  const previousCustomerId =
+    formData.get("previousCustomerId")?.toString().trim() ?? "";
   const combinesWithShipping = formData.get("combinesWithShipping") === "true";
   const startsAt = formData.get("startsAt")?.toString() ?? "";
   const endsAt = formData.get("endsAt")?.toString() ?? "";
   const usageLimitRaw = formData.get("usageLimit")?.toString().trim() ?? "";
-  const appliesOncePerCustomer = formData.get("appliesOncePerCustomer") === "true";
+  const appliesOncePerCustomer =
+    formData.get("appliesOncePerCustomer") === "true";
 
   if (!code || !customerId) {
-    return { ok: false, intent: "updateDiscount", error: "Pick a customer and enter a code." };
+    return {
+      ok: false,
+      intent: "updateDiscount",
+      error: "Pick a customer and enter a code.",
+    };
   }
 
   const customers = { add: [customerId] };
@@ -205,7 +227,11 @@ export const action = async ({ params, request }) => {
   const userErrors = data?.discountCodeAppUpdate?.userErrors ?? [];
 
   if (userErrors.length > 0) {
-    return { ok: false, intent: "updateDiscount", error: userErrors.map((e) => e.message).join(" ") };
+    return {
+      ok: false,
+      intent: "updateDiscount",
+      error: userErrors.map((e) => e.message).join(" "),
+    };
   }
 
   return { ok: true, intent: "updateDiscount" };
@@ -217,7 +243,9 @@ export default function DiscountDetail() {
   const detailFetcher = useFetcher();
   const tiersFetcher = useFetcher();
 
-  const [customer, setCustomer] = useState(loaderData.notFound ? null : loaderData.customer);
+  const [customer, setCustomer] = useState(
+    loaderData.notFound ? null : loaderData.customer,
+  );
   const [code, setCode] = useState(loaderData.notFound ? "" : loaderData.code);
   const [combinesWithShipping, setCombinesWithShipping] = useState(
     loaderData.notFound ? true : loaderData.combinesWithShipping,
@@ -234,7 +262,9 @@ export default function DiscountDetail() {
   const [appliesOncePerCustomer, setAppliesOncePerCustomer] = useState(
     loaderData.notFound ? false : loaderData.appliesOncePerCustomer,
   );
-  const [tiers, setTiers] = useState(loaderData.notFound ? [] : loaderData.tiers);
+  const [tiers, setTiers] = useState(
+    loaderData.notFound ? [] : loaderData.tiers,
+  );
 
   const isSavingDetail = detailFetcher.state !== "idle";
   const isSavingTiers = tiersFetcher.state !== "idle";
@@ -257,7 +287,8 @@ export default function DiscountDetail() {
       })),
     );
   const isTiersDirty =
-    !loaderData.notFound && normalizeTiers(tiers) !== normalizeTiers(loaderData.tiers);
+    !loaderData.notFound &&
+    normalizeTiers(tiers) !== normalizeTiers(loaderData.tiers);
 
   useEffect(() => {
     if (detailFetcher.data?.ok) {
@@ -316,7 +347,9 @@ export default function DiscountDetail() {
 
   const handleTierChange = (index, field, value) => {
     setTiers((current) =>
-      current.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier)),
+      current.map((tier, i) =>
+        i === index ? { ...tier, [field]: value } : tier,
+      ),
     );
   };
 
@@ -353,7 +386,9 @@ export default function DiscountDetail() {
       <s-button
         slot="primary-action"
         variant="primary"
-        {...(!customer || !code.trim() || isSavingDetail || !isDetailDirty ? { disabled: true } : {})}
+        {...(!customer || !code.trim() || isSavingDetail || !isDetailDirty
+          ? { disabled: true }
+          : {})}
         {...(isSavingDetail ? { loading: true } : {})}
         onClick={handleSaveDetail}
       >
@@ -369,23 +404,29 @@ export default function DiscountDetail() {
       <s-section heading="Discount details">
         <s-stack direction="block" gap="base">
           <CustomerPicker value={customer} onChange={setCustomer} />
-          <s-stack direction="inline" gap="small-300" alignItems="end">
-            <s-text-field
-              label="Code"
-              value={code}
-              onInput={(event) => setCode(event.currentTarget.value.toUpperCase())}
-            ></s-text-field>
-            <s-button variant="tertiary" onClick={handleCopyCode} accessibilityLabel="Copy code">
+          <s-text-field
+            label="Code"
+            value={code}
+            onInput={(event) =>
+              setCode(event.currentTarget.value.toUpperCase())
+            }
+          >
+            <s-button
+              slot="accessory"
+              variant="tertiary"
+              onClick={handleCopyCode}
+              accessibilityLabel="Copy code"
+            >
               📋
             </s-button>
-          </s-stack>
+          </s-text-field>
         </s-stack>
       </s-section>
 
       <s-section heading="Discount tiers">
         <s-banner tone="warning" heading="Shared across every code">
           <s-paragraph>
-            These tiers apply to every discount code this app creates — changing
+            These tiers apply to every discount code this app creates - changing
             them here updates the discount for all customers, not just this one.
           </s-paragraph>
         </s-banner>
@@ -402,14 +443,29 @@ export default function DiscountDetail() {
               <s-number-field
                 label="Cart subtotal at or above"
                 value={String(tier.minSubtotal)}
-                onInput={(event) => handleTierChange(index, "minSubtotal", event.currentTarget.value)}
+                onInput={(event) =>
+                  handleTierChange(
+                    index,
+                    "minSubtotal",
+                    event.currentTarget.value,
+                  )
+                }
               ></s-number-field>
               <s-number-field
                 label="Discount %"
                 value={String(tier.percentage)}
-                onInput={(event) => handleTierChange(index, "percentage", event.currentTarget.value)}
+                onInput={(event) =>
+                  handleTierChange(
+                    index,
+                    "percentage",
+                    event.currentTarget.value,
+                  )
+                }
               ></s-number-field>
-              <s-button variant="tertiary" onClick={() => handleRemoveTier(index)}>
+              <s-button
+                variant="tertiary"
+                onClick={() => handleRemoveTier(index)}
+              >
                 Remove
               </s-button>
             </s-stack>
@@ -440,8 +496,11 @@ export default function DiscountDetail() {
             </s-badge>
           </s-stack>
           <s-stack direction="block" gap="small-300">
-            <s-text tone="subdued">Made for</s-text>
-            <s-text fontWeight="bold">{customer?.displayName ?? "No customer selected"}</s-text>
+            <s-text color="subdued">Made for</s-text>
+            <s-text type="strong">
+              {customer?.displayName ?? "No customer selected"}
+            </s-text>
+            {/* {customer?.email && <s-text tone="subdued">{customer.email}</s-text>} */}
           </s-stack>
         </s-stack>
       </s-section>
@@ -451,12 +510,16 @@ export default function DiscountDetail() {
           <s-checkbox
             label="Combine with shipping discounts"
             {...(combinesWithShipping ? { checked: true } : {})}
-            onChange={(event) => setCombinesWithShipping(event.currentTarget.checked)}
+            onChange={(event) =>
+              setCombinesWithShipping(event.currentTarget.checked)
+            }
           ></s-checkbox>
           <s-checkbox
             label="Limit to one use per customer"
             {...(appliesOncePerCustomer ? { checked: true } : {})}
-            onChange={(event) => setAppliesOncePerCustomer(event.currentTarget.checked)}
+            onChange={(event) =>
+              setAppliesOncePerCustomer(event.currentTarget.checked)
+            }
           ></s-checkbox>
           <s-number-field
             label="Total usage limit"

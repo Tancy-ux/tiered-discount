@@ -75,7 +75,7 @@ export const action = async ({ request }) => {
       mutation CreateCustomerCode($discount: DiscountCodeAppInput!) {
         discountCodeAppCreate(codeAppDiscount: $discount) {
           codeAppDiscount {
-            id
+            discountId
             title
           }
           userErrors {
@@ -111,7 +111,7 @@ export const action = async ({ request }) => {
 
   return {
     ok: true,
-    id: legacyId(data.discountCodeAppCreate.codeAppDiscount.id),
+    id: legacyId(data.discountCodeAppCreate.codeAppDiscount.discountId),
     title: data.discountCodeAppCreate.codeAppDiscount.title,
   };
 };
