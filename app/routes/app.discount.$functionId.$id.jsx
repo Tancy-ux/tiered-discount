@@ -24,6 +24,9 @@ export const loader = async ({ params, request }) => {
       query GetDiscount($id: ID!) {
         discountNode(id: $id) {
           id
+          notesMetafield: metafield(namespace: "tiered_discount", key: "notes") {
+            value
+          }
           discount {
             __typename
             ... on DiscountCodeApp {
@@ -108,6 +111,7 @@ export const loader = async ({ params, request }) => {
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
     customer,
     tiers,
+    notes: data.discountNode.notesMetafield?.value ?? "",
     shopId: data.shop.id,
   };
 };
@@ -176,18 +180,25 @@ export const action = async ({ params, request }) => {
   const usageLimitRaw = formData.get("usageLimit")?.toString().trim() ?? "";
   const appliesOncePerCustomer =
     formData.get("appliesOncePerCustomer") === "true";
+  const notes = formData.get("notes")?.toString() ?? "";
 
-  if (!code || !customerId) {
+  if (!code) {
     return {
       ok: false,
       intent: "updateDiscount",
-      error: "Pick a customer and enter a code.",
+      error: "Enter a code.",
     };
   }
 
-  const customers = { add: [customerId] };
-  if (previousCustomerId && previousCustomerId !== customerId) {
-    customers.remove = [previousCustomerId];
+  let context;
+  if (customerId) {
+    const customers = { add: [customerId] };
+    if (previousCustomerId && previousCustomerId !== customerId) {
+      customers.remove = [previousCustomerId];
+    }
+    context = { customers };
+  } else if (previousCustomerId) {
+    context = { customers: { remove: [previousCustomerId] } };
   }
 
   const response = await admin.graphql(
@@ -218,7 +229,7 @@ export const action = async ({ params, request }) => {
           endsAt: endsAt ? `${endsAt}T00:00:00Z` : null,
           usageLimit: usageLimitRaw ? Number(usageLimitRaw) : null,
           appliesOncePerCustomer,
-          context: { customers },
+          ...(context ? { context } : {}),
         },
       },
     },
@@ -231,6 +242,41 @@ export const action = async ({ params, request }) => {
       ok: false,
       intent: "updateDiscount",
       error: userErrors.map((e) => e.message).join(" "),
+    };
+  }
+
+  const notesResponse = await admin.graphql(
+    `#graphql
+      mutation SetDiscountNotes($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          userErrors {
+            field
+            message
+          }
+        }
+      }`,
+    {
+      variables: {
+        metafields: [
+          {
+            ownerId: `gid://shopify/DiscountNode/${id}`,
+            namespace: "tiered_discount",
+            key: "notes",
+            type: "multi_line_text_field",
+            value: notes,
+          },
+        ],
+      },
+    },
+  );
+  const notesData = await notesResponse.json();
+  const notesErrors = notesData?.data?.metafieldsSet?.userErrors ?? [];
+
+  if (notesErrors.length > 0) {
+    return {
+      ok: false,
+      intent: "updateDiscount",
+      error: notesErrors.map((e) => e.message).join(" "),
     };
   }
 
@@ -265,6 +311,7 @@ export default function DiscountDetail() {
   const [tiers, setTiers] = useState(
     loaderData.notFound ? [] : loaderData.tiers,
   );
+  const [notes, setNotes] = useState(loaderData.notFound ? "" : loaderData.notes);
 
   const isSavingDetail = detailFetcher.state !== "idle";
   const isSavingTiers = tiersFetcher.state !== "idle";
@@ -277,7 +324,8 @@ export default function DiscountDetail() {
       startsAt !== toDateInputValue(loaderData.startsAt) ||
       endsAt !== toDateInputValue(loaderData.endsAt) ||
       String(usageLimit) !== String(loaderData.usageLimit ?? "") ||
-      appliesOncePerCustomer !== loaderData.appliesOncePerCustomer);
+      appliesOncePerCustomer !== loaderData.appliesOncePerCustomer ||
+      notes !== (loaderData.notes ?? ""));
 
   const normalizeTiers = (list) =>
     JSON.stringify(
@@ -329,17 +377,18 @@ export default function DiscountDetail() {
   };
 
   const handleSaveDetail = () => {
-    if (!customer || !code.trim() || isSavingDetail) return;
+    if (!code.trim() || isSavingDetail) return;
     detailFetcher.submit(
       {
         code: code.trim(),
-        customerId: customer.id,
+        customerId: customer?.id ?? "",
         previousCustomerId: loaderData.customer?.id ?? "",
         combinesWithShipping: String(combinesWithShipping),
         startsAt,
         endsAt,
         usageLimit: String(usageLimit),
         appliesOncePerCustomer: String(appliesOncePerCustomer),
+        notes,
       },
       { method: "post" },
     );
@@ -386,7 +435,7 @@ export default function DiscountDetail() {
       <s-button
         slot="primary-action"
         variant="primary"
-        {...(!customer || !code.trim() || isSavingDetail || !isDetailDirty
+        {...(!code.trim() || isSavingDetail || !isDetailDirty
           ? { disabled: true }
           : {})}
         {...(isSavingDetail ? { loading: true } : {})}
@@ -490,7 +539,7 @@ export default function DiscountDetail() {
       <s-section slot="aside" heading="Summary">
         <s-stack direction="block" gap="base">
           <s-stack direction="block" gap="small-300">
-            <s-text tone="subdued">Status</s-text>
+            <s-text color="subdued">Status</s-text>
             <s-badge tone={loaderData.status === "ACTIVE" ? "success" : "info"}>
               {loaderData.status}
             </s-badge>
@@ -498,9 +547,9 @@ export default function DiscountDetail() {
           <s-stack direction="block" gap="small-300">
             <s-text color="subdued">Made for</s-text>
             <s-text type="strong">
-              {customer?.displayName ?? "No customer selected"}
+              {customer?.displayName ?? "Anyone with the code"}
             </s-text>
-            {/* {customer?.email && <s-text tone="subdued">{customer.email}</s-text>} */}
+            {customer?.email && <s-text color="subdued">{customer.email}</s-text>}
           </s-stack>
         </s-stack>
       </s-section>
@@ -538,6 +587,17 @@ export default function DiscountDetail() {
             onChange={(event) => setEndsAt(event.currentTarget.value)}
           ></s-date-field>
         </s-stack>
+      </s-section>
+
+      <s-section slot="aside" heading="Notes">
+        <s-text-area
+          label="Notes"
+          labelAccessibilityVisibility="exclusive"
+          placeholder="Anything worth remembering about this code…"
+          rows={4}
+          value={notes}
+          onInput={(event) => setNotes(event.currentTarget.value)}
+        ></s-text-area>
       </s-section>
     </s-page>
   );

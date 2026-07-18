@@ -23,8 +23,8 @@ export function CustomerPicker({ value, onChange }) {
       <s-box padding="base" borderWidth="base" borderRadius="base">
         <s-stack direction="inline" gap="base" alignItems="center">
           <s-stack direction="block" gap="small-300">
-            <s-text fontWeight="bold">{value.displayName}</s-text>
-            {value.email && <s-text tone="subdued">{value.email}</s-text>}
+            <s-text type="strong">{value.displayName}</s-text>
+            {value.email && <s-text color="subdued">{value.email}</s-text>}
           </s-stack>
           <s-button variant="tertiary" onClick={() => onChange(null)}>
             Change
@@ -46,7 +46,7 @@ export function CustomerPicker({ value, onChange }) {
         <s-box borderWidth="base" borderRadius="base">
           {searchResults.length === 0 ? (
             <s-box padding="base">
-              <s-text tone="subdued">
+              <s-text color="subdued">
                 {searchFetcher.state === "idle"
                   ? "No matching customers"
                   : "Searching…"}
@@ -66,7 +66,7 @@ export function CustomerPicker({ value, onChange }) {
                   <s-stack direction="block" gap="small-300">
                     <s-text>{customer.displayName}</s-text>
                     {customer.email && (
-                      <s-text tone="subdued">{customer.email}</s-text>
+                      <s-text color="subdued">{customer.email}</s-text>
                     )}
                   </s-stack>
                 </s-clickable>

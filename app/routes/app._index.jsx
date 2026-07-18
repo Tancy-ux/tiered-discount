@@ -48,8 +48,9 @@ export const loader = async ({ request }) => {
   );
 
   const tieredFunction =
-    data.shopifyFunctions.nodes.find((node) => node.title === "Tiered order discount") ??
-    data.shopifyFunctions.nodes[0];
+    data.shopifyFunctions.nodes.find(
+      (node) => node.title === "Tiered order discount",
+    ) ?? data.shopifyFunctions.nodes[0];
 
   return {
     totalCodes: codes.length,
@@ -66,8 +67,8 @@ export const action = async ({ request }) => {
   const code = formData.get("code")?.toString().trim() ?? "";
   const customerId = formData.get("customerId")?.toString().trim() ?? "";
 
-  if (!code || !customerId) {
-    return { ok: false, error: "Pick a customer and enter a code." };
+  if (!code) {
+    return { ok: false, error: "Enter a code." };
   }
 
   const response = await admin.graphql(
@@ -97,7 +98,9 @@ export const action = async ({ request }) => {
             shippingDiscounts: true,
           },
           startsAt: new Date().toISOString(),
-          context: { customers: { add: [customerId] } },
+          ...(customerId
+            ? { context: { customers: { add: [customerId] } } }
+            : {}),
         },
       },
     },
@@ -147,9 +150,9 @@ export default function Home() {
   };
 
   const handleSave = () => {
-    if (!selectedCustomer || !code.trim() || isSaving) return;
+    if (!code.trim() || isSaving) return;
     createFetcher.submit(
-      { code: code.trim(), customerId: selectedCustomer.id },
+      { code: code.trim(), customerId: selectedCustomer?.id ?? "" },
       { method: "post" },
     );
   };
@@ -160,8 +163,8 @@ export default function Home() {
         <s-paragraph>
           Every code you create here gets the same automatic tiered discount: 5%
           under ₹50,000, 7.5% from ₹50,000 – ₹2,99,999, and 10% from ₹3,00,000
-          up — applied at checkout, no extra setup. Just pick a customer and
-          save.
+          up - applied at checkout, no extra setup. Pick a customer to restrict
+          the code to them, or leave it blank to let anyone use it.
         </s-paragraph>
       </s-banner>
 
@@ -177,6 +180,9 @@ export default function Home() {
             value={selectedCustomer}
             onChange={handleSelectCustomer}
           />
+          <s-text color="subdued">
+            Optional - leave blank and anyone with the code can use it.
+          </s-text>
 
           <s-text-field
             label="Discount code"
@@ -188,9 +194,7 @@ export default function Home() {
 
           <s-button
             variant="primary"
-            {...(!selectedCustomer || !code.trim() || isSaving
-              ? { disabled: true }
-              : {})}
+            {...(!code.trim() || isSaving ? { disabled: true } : {})}
             {...(isSaving ? { loading: true } : {})}
             onClick={handleSave}
           >
@@ -203,13 +207,13 @@ export default function Home() {
         <s-stack direction="block" gap="base">
           <s-box padding="base" borderWidth="base" borderRadius="base">
             <s-stack direction="block" gap="small-300">
-              <s-text tone="subdued">Active codes</s-text>
+              <s-text color="subdued">Active codes</s-text>
               <s-heading>{activeCodes}</s-heading>
             </s-stack>
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base">
             <s-stack direction="block" gap="small-300">
-              <s-text tone="subdued">Total codes created</s-text>
+              <s-text color="subdued">Total codes created</s-text>
               <s-heading>{totalCodes}</s-heading>
             </s-stack>
           </s-box>
