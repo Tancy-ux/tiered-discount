@@ -8,7 +8,7 @@ export const action = async ({ request }) => {
   const current = payload.current;
 
   if (session) {
-    await db.session.update({
+    await db.session.updateMany({
       where: {
         id: session.id,
       },
