@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, redirect } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -170,6 +170,32 @@ export const action = async ({ params, request }) => {
     return { ok: true, intent };
   }
 
+  if (intent === "delete") {
+    const response = await admin.graphql(
+      `#graphql
+        mutation DeleteDiscountCode($id: ID!) {
+          discountCodeDelete(id: $id) {
+            deletedCodeDiscountId
+            userErrors {
+              field
+              message
+            }
+          }
+        }`,
+      { variables: { id: `gid://shopify/DiscountCodeApp/${id}` } },
+    );
+    const { data } = await response.json();
+    const userErrors = data?.discountCodeDelete?.userErrors ?? [];
+    if (userErrors.length > 0) {
+      return {
+        ok: false,
+        intent,
+        error: userErrors.map((e) => e.message).join(" "),
+      };
+    }
+    return redirect("/app/discounts");
+  }
+
   const code = formData.get("code")?.toString().trim() ?? "";
   const customerId = formData.get("customerId")?.toString().trim() ?? "";
   const previousCustomerId =
@@ -288,6 +314,7 @@ export default function DiscountDetail() {
   const shopify = useAppBridge();
   const detailFetcher = useFetcher();
   const tiersFetcher = useFetcher();
+  const deleteFetcher = useFetcher();
 
   const [customer, setCustomer] = useState(
     loaderData.notFound ? null : loaderData.customer,
@@ -315,6 +342,7 @@ export default function DiscountDetail() {
 
   const isSavingDetail = detailFetcher.state !== "idle";
   const isSavingTiers = tiersFetcher.state !== "idle";
+  const isDeleting = deleteFetcher.state !== "idle";
 
   const isDetailDirty =
     !loaderData.notFound &&
@@ -350,6 +378,12 @@ export default function DiscountDetail() {
     }
   }, [tiersFetcher.data, shopify]);
 
+  useEffect(() => {
+    if (deleteFetcher.data?.ok === false) {
+      shopify.toast.show("Couldn't delete code", { isError: true });
+    }
+  }, [deleteFetcher.data, shopify]);
+
   if (loaderData.notFound) {
     return (
       <s-page heading="Discount not found">
@@ -366,6 +400,14 @@ export default function DiscountDetail() {
       </s-page>
     );
   }
+
+  const handleDelete = () => {
+    if (isDeleting) return;
+    if (!confirm(`Delete the code "${loaderData.code}"? This can't be undone.`)) {
+      return;
+    }
+    deleteFetcher.submit({ intent: "delete" }, { method: "post" });
+  };
 
   const handleCopyCode = async () => {
     try {
@@ -442,6 +484,16 @@ export default function DiscountDetail() {
         onClick={handleSaveDetail}
       >
         Save changes
+      </s-button>
+
+      <s-button
+        slot="secondary-actions"
+        variant="secondary"
+        tone="critical"
+        {...(isDeleting ? { disabled: true, loading: true } : {})}
+        onClick={handleDelete}
+      >
+        Delete
       </s-button>
 
       {detailFetcher.data?.ok === false && (
