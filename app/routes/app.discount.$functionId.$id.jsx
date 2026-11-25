@@ -5,7 +5,12 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
 import { TierEditor, hasBadTiers } from "../components/TierEditor";
-import { DEFAULT_TIERS, readTiers, tiersForSubmit } from "../tiers";
+import {
+  DEFAULT_TIERS,
+  confirmLargeDiscount,
+  readTiers,
+  tiersForSubmit,
+} from "../tiers";
 import {
   cleanTiers,
   clearCodeTiers,
@@ -124,7 +129,6 @@ export const loader = async ({ params, request }) => {
     defaultTiers,
     customTiers,
     notes: data.discountNode.notesMetafield?.value ?? "",
-    shopId: data.shop.id,
   };
 };
 
@@ -133,75 +137,6 @@ export const action = async ({ params, request }) => {
   const { id } = params;
   const formData = await request.formData();
   const intent = formData.get("intent");
-
-  if (intent === "saveCodeTiers") {
-    // Custom tiers for this code only; other codes are untouched.
-    const { tiers, error } = cleanTiers(formData.get("tiers")?.toString());
-    if (error) return { ok: false, intent, error };
-    const errors = await setCodeTiers(
-      admin,
-      `gid://shopify/DiscountNode/${id}`,
-      tiers,
-    );
-    return errors.length > 0
-      ? { ok: false, intent, error: errors.join(" ") }
-      : { ok: true, intent };
-  }
-
-  if (intent === "useDefaultTiers") {
-    const errors = await clearCodeTiers(
-      admin,
-      `gid://shopify/DiscountNode/${id}`,
-    );
-    return errors.length > 0
-      ? { ok: false, intent, error: errors.join(" ") }
-      : { ok: true, intent };
-  }
-
-  if (intent === "updateTiers") {
-    // The shop's default tiers, used by every code without custom tiers.
-    const shopId = formData.get("shopId")?.toString() ?? "";
-    const { tiers, error } = cleanTiers(formData.get("tiers")?.toString());
-    if (error) return { ok: false, intent, error };
-
-    const response = await admin.graphql(
-      `#graphql
-        mutation SetTierConfig($metafields: [MetafieldsSetInput!]!) {
-          metafieldsSet(metafields: $metafields) {
-            metafields {
-              id
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }`,
-      {
-        variables: {
-          metafields: [
-            {
-              ownerId: shopId,
-              namespace: "tiered_discount",
-              key: "config",
-              type: "json",
-              value: JSON.stringify({ tiers }),
-            },
-          ],
-        },
-      },
-    );
-    const { data } = await response.json();
-    const userErrors = data?.metafieldsSet?.userErrors ?? [];
-    if (userErrors.length > 0) {
-      return {
-        ok: false,
-        intent,
-        error: userErrors.map((e) => e.message).join(" "),
-      };
-    }
-    return { ok: true, intent };
-  }
 
   if (intent === "delete") {
     const response = await admin.graphql(
@@ -240,6 +175,8 @@ export const action = async ({ params, request }) => {
   const appliesOncePerCustomer =
     formData.get("appliesOncePerCustomer") === "true";
   const notes = formData.get("notes")?.toString() ?? "";
+  const useCustomTiers = formData.get("useCustomTiers") === "true";
+  const hadCustomTiers = formData.get("hadCustomTiers") === "true";
 
   if (!code) {
     return {
@@ -247,6 +184,15 @@ export const action = async ({ params, request }) => {
       intent: "updateDiscount",
       error: "Enter a code.",
     };
+  }
+
+  // Check the tiers before changing anything, so a bad tier never leaves
+  // the code half saved.
+  let customTiers = null;
+  if (useCustomTiers) {
+    const { tiers, error } = cleanTiers(formData.get("tiers")?.toString());
+    if (error) return { ok: false, intent: "updateDiscount", error };
+    customTiers = tiers;
   }
 
   let context;
@@ -320,6 +266,20 @@ export const action = async ({ params, request }) => {
     };
   }
 
+  // This code's own tiers, or back to the shop's default tiers.
+  const tierErrors = customTiers
+    ? await setCodeTiers(admin, `gid://shopify/DiscountNode/${id}`, customTiers)
+    : hadCustomTiers
+      ? await clearCodeTiers(admin, `gid://shopify/DiscountNode/${id}`)
+      : [];
+  if (tierErrors.length > 0) {
+    return {
+      ok: false,
+      intent: "updateDiscount",
+      error: tierErrors.join(" "),
+    };
+  }
+
   const notesResponse = await admin.graphql(
     `#graphql
       mutation SetDiscountNotes($metafields: [MetafieldsSetInput!]!) {
@@ -362,7 +322,6 @@ export default function DiscountDetail() {
   const loaderData = useLoaderData();
   const shopify = useAppBridge();
   const detailFetcher = useFetcher();
-  const tiersFetcher = useFetcher();
   const deleteFetcher = useFetcher();
 
   const [customer, setCustomer] = useState(
@@ -385,28 +344,20 @@ export default function DiscountDetail() {
     loaderData.notFound ? false : loaderData.appliesOncePerCustomer,
   );
   // Codes follow the shop's default tiers unless given their own.
-  const [useCustomTiers, setUseCustomTiers] = useState(
-    !loaderData.notFound && loaderData.customTiers != null,
-  );
-  const [defaultTiersDraft, setDefaultTiersDraft] = useState(
-    loaderData.notFound ? [] : loaderData.defaultTiers,
-  );
+  const hasSavedCustomTiers =
+    !loaderData.notFound && loaderData.customTiers != null;
+  const [useCustomTiers, setUseCustomTiers] = useState(hasSavedCustomTiers);
   const [customTiersDraft, setCustomTiersDraft] = useState(
     loaderData.notFound
       ? []
       : (loaderData.customTiers ?? loaderData.defaultTiers),
   );
-  const tiers = useCustomTiers ? customTiersDraft : defaultTiersDraft;
-  const setTiers = useCustomTiers ? setCustomTiersDraft : setDefaultTiersDraft;
 
   // After a save the server returns the tiers sorted by subtotal; show that
-  // saved version so the form doesn't look unsaved. Keyed on the values (not
-  // the loaderData object) so saving other details doesn't wipe tier edits.
-  const savedDefaultKey = loaderData.notFound ? "" : JSON.stringify(loaderData.defaultTiers);
-  const savedCustomKey = loaderData.notFound ? "" : JSON.stringify(loaderData.customTiers);
-  useEffect(() => {
-    if (savedDefaultKey) setDefaultTiersDraft(JSON.parse(savedDefaultKey));
-  }, [savedDefaultKey]);
+  // saved version so the form doesn't look unsaved.
+  const savedCustomKey = loaderData.notFound
+    ? ""
+    : JSON.stringify(loaderData.customTiers);
   useEffect(() => {
     const saved = savedCustomKey ? JSON.parse(savedCustomKey) : null;
     if (saved) setCustomTiersDraft(saved);
@@ -414,11 +365,18 @@ export default function DiscountDetail() {
 
   const [notes, setNotes] = useState(loaderData.notFound ? "" : loaderData.notes);
 
-  const isSavingDetail = detailFetcher.state !== "idle";
-  const isSavingTiers = tiersFetcher.state !== "idle";
+  const isSaving = detailFetcher.state !== "idle";
   const isDeleting = deleteFetcher.state !== "idle";
 
-  const isDetailDirty =
+  const normalizeTiers = (list) => JSON.stringify(tiersForSubmit(list));
+  const isTiersDirty =
+    !loaderData.notFound &&
+    (useCustomTiers !== hasSavedCustomTiers ||
+      (useCustomTiers &&
+        normalizeTiers(customTiersDraft) !==
+          normalizeTiers(loaderData.customTiers)));
+
+  const isDirty =
     !loaderData.notFound &&
     ((customer?.id ?? null) !== (loaderData.customer?.id ?? null) ||
       code.trim() !== loaderData.code ||
@@ -427,42 +385,19 @@ export default function DiscountDetail() {
       endsAt !== toDateInputValue(loaderData.endsAt) ||
       String(usageLimit) !== String(loaderData.usageLimit ?? "") ||
       appliesOncePerCustomer !== loaderData.appliesOncePerCustomer ||
-      notes !== (loaderData.notes ?? ""));
+      notes !== (loaderData.notes ?? "") ||
+      isTiersDirty);
 
-  const normalizeTiers = (list) => JSON.stringify(tiersForSubmit(list));
-  const hasSavedCustomTiers = !loaderData.notFound && loaderData.customTiers != null;
-  // Switching a custom code back to the defaults: save that first, then the
-  // defaults can be edited (one save never does both).
-  const isSwitchingToDefault = !useCustomTiers && hasSavedCustomTiers;
-  const canEditTiers = useCustomTiers || !hasSavedCustomTiers;
-  let isTiersDirty = false;
-  if (!loaderData.notFound) {
-    if (useCustomTiers) {
-      isTiersDirty =
-        !hasSavedCustomTiers ||
-        normalizeTiers(customTiersDraft) !== normalizeTiers(loaderData.customTiers);
-    } else {
-      isTiersDirty =
-        isSwitchingToDefault ||
-        normalizeTiers(defaultTiersDraft) !== normalizeTiers(loaderData.defaultTiers);
-    }
-  }
+  const tiersInvalid =
+    useCustomTiers &&
+    (customTiersDraft.length === 0 || hasBadTiers(customTiersDraft));
+  const canSave = Boolean(code.trim()) && isDirty && !isSaving && !tiersInvalid;
 
   useEffect(() => {
     if (detailFetcher.data?.ok) {
       shopify.toast.show("Discount code updated");
     }
   }, [detailFetcher.data, shopify]);
-
-  useEffect(() => {
-    if (!tiersFetcher.data?.ok) return;
-    const messages = {
-      saveCodeTiers: "Custom tiers saved for this code",
-      useDefaultTiers: "This code now uses the default tiers",
-      updateTiers: "Default tiers updated",
-    };
-    shopify.toast.show(messages[tiersFetcher.data.intent] ?? "Tiers updated");
-  }, [tiersFetcher.data, shopify]);
 
   useEffect(() => {
     if (deleteFetcher.data?.ok === false) {
@@ -504,8 +439,9 @@ export default function DiscountDetail() {
     }
   };
 
-  const handleSaveDetail = () => {
-    if (!code.trim() || isSavingDetail) return;
+  const handleSave = () => {
+    if (!canSave) return;
+    if (useCustomTiers && !confirmLargeDiscount(customTiersDraft)) return;
     detailFetcher.submit(
       {
         code: code.trim(),
@@ -517,27 +453,10 @@ export default function DiscountDetail() {
         usageLimit: String(usageLimit),
         appliesOncePerCustomer: String(appliesOncePerCustomer),
         notes,
+        useCustomTiers: String(useCustomTiers),
+        hadCustomTiers: String(hasSavedCustomTiers),
+        tiers: JSON.stringify(tiersForSubmit(customTiersDraft)),
       },
-      { method: "post" },
-    );
-  };
-
-  const handleSaveTiers = () => {
-    if (isSavingTiers || !isTiersDirty) return;
-    if (canEditTiers && hasBadTiers(tiers)) return;
-    if (isSwitchingToDefault) {
-      tiersFetcher.submit({ intent: "useDefaultTiers" }, { method: "post" });
-      return;
-    }
-    const cleaned = tiersForSubmit(tiers);
-    tiersFetcher.submit(
-      useCustomTiers
-        ? { intent: "saveCodeTiers", tiers: JSON.stringify(cleaned) }
-        : {
-            intent: "updateTiers",
-            shopId: loaderData.shopId,
-            tiers: JSON.stringify(cleaned),
-          },
       { method: "post" },
     );
   };
@@ -551,11 +470,9 @@ export default function DiscountDetail() {
       <s-button
         slot="primary-action"
         variant="primary"
-        {...(!code.trim() || isSavingDetail || !isDetailDirty
-          ? { disabled: true }
-          : {})}
-        {...(isSavingDetail ? { loading: true } : {})}
-        onClick={handleSaveDetail}
+        {...(canSave ? {} : { disabled: true })}
+        {...(isSaving ? { loading: true } : {})}
+        onClick={handleSave}
       >
         Save changes
       </s-button>
@@ -608,57 +525,35 @@ export default function DiscountDetail() {
           ></s-checkbox>
 
           {useCustomTiers ? (
-            <s-banner tone="info" heading="Custom tiers for this code only">
-              <s-paragraph>
+            <>
+              <s-text color="subdued">
                 {`These tiers apply only to ${loaderData.code}. Changing the default tiers won't affect it.`}
-              </s-paragraph>
-            </s-banner>
-          ) : isSwitchingToDefault ? (
-            <s-banner tone="info" heading="Back to the default tiers">
-              <s-paragraph>
-                {"Save to remove this code's custom tiers. It will then use the default tiers below."}
-              </s-paragraph>
-            </s-banner>
+              </s-text>
+              <TierEditor
+                tiers={customTiersDraft}
+                onChange={setCustomTiersDraft}
+              />
+              {customTiersDraft.length === 0 && (
+                <s-text color="subdued">Add at least one tier.</s-text>
+              )}
+            </>
           ) : (
-            <s-banner tone="warning" heading="Default tiers, shared across codes">
-              <s-paragraph>
-                {`Changing these updates every code that uses the default tiers. Codes with custom tiers aren't affected. To change only this code, tick "Use custom tiers for this code".`}
-              </s-paragraph>
-            </s-banner>
+            <>
+              <s-text color="subdued">
+                {hasSavedCustomTiers
+                  ? "Save changes to remove this code's custom tiers. It will then use the default tiers:"
+                  : "This code uses the default tiers, shared by every code without custom tiers:"}
+              </s-text>
+              <TierEditor
+                tiers={loaderData.defaultTiers}
+                onChange={() => {}}
+                disabled
+              />
+              <s-link href="/app/settings">
+                Change default tiers in Settings
+              </s-link>
+            </>
           )}
-        </s-stack>
-
-        {tiersFetcher.data?.ok === false && (
-          <s-banner tone="critical" heading="Couldn't save tiers">
-            <s-paragraph>{tiersFetcher.data.error}</s-paragraph>
-          </s-banner>
-        )}
-
-        <s-stack direction="block" gap="base">
-          <TierEditor
-            tiers={tiers}
-            onChange={setTiers}
-            disabled={!canEditTiers}
-          />
-
-          <s-stack direction="inline" gap="base">
-            <s-button
-              variant="primary"
-              {...(isSavingTiers ||
-              !isTiersDirty ||
-              (canEditTiers && hasBadTiers(tiers))
-                ? { disabled: true }
-                : {})}
-              {...(isSavingTiers ? { loading: true } : {})}
-              onClick={handleSaveTiers}
-            >
-              {useCustomTiers
-                ? "Save custom tiers"
-                : isSwitchingToDefault
-                  ? "Use default tiers"
-                  : "Save default tiers"}
-            </s-button>
-          </s-stack>
         </s-stack>
       </s-section>
 

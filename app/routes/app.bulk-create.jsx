@@ -4,7 +4,12 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { TierEditor, hasBadTiers } from "../components/TierEditor";
-import { DEFAULT_TIERS, readTiers, tiersForSubmit } from "../tiers";
+import {
+  DEFAULT_TIERS,
+  confirmLargeDiscount,
+  readTiers,
+  tiersForSubmit,
+} from "../tiers";
 import {
   cleanTiers,
   codeTiersMetafields,
@@ -140,6 +145,7 @@ export default function BulkCreate() {
 
   const handleSubmit = () => {
     if (!codesText.trim() || isSubmitting || tiersInvalid) return;
+    if (useCustomTiers && !confirmLargeDiscount(tiers)) return;
     fetcher.submit(
       {
         codes: codesText,

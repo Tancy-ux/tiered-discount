@@ -8,6 +8,8 @@ import {
   customerLockMetafields,
   syncCustomerLocks,
 } from "../discount-metafields.server";
+import { loadShop } from "../shop.server";
+import { describeTiers } from "../tiers";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
 
@@ -77,7 +79,10 @@ export const loader = async ({ request }) => {
       (node) => node.title === "Tiered order discount",
     ) ?? data.shopifyFunctions.nodes[0];
 
+  const { defaultTiers, currencyCode } = await loadShop(admin);
+
   return {
+    tiersSummary: describeTiers(defaultTiers, currencyCode),
     totalCodes: codes.length,
     activeCodes: codes.filter((node) => node.discount.status === "ACTIVE")
       .length,
@@ -148,7 +153,8 @@ export const action = async ({ request }) => {
 };
 
 export default function Home() {
-  const { totalCodes, activeCodes, functionId } = useLoaderData();
+  const { tiersSummary, totalCodes, activeCodes, functionId } =
+    useLoaderData();
   const createFetcher = useFetcher();
   const shopify = useAppBridge();
   const navigate = useNavigate();
@@ -189,11 +195,9 @@ export default function Home() {
     <s-page heading="Tiered order discount">
       <s-banner tone="info" heading="Tiered Order Discounts">
         <s-paragraph>
-          Every code you create here gets the same automatic tiered discount: 5%
-          under ₹50,000, 7.5% from ₹50,000 – ₹2,99,999, and 10% from ₹3,00,000
-          up - applied at checkout, no extra setup. Pick a customer to restrict
-          the code to them, or leave it blank to let anyone use it.
+          {`Codes you create here get your default tiers at checkout: ${tiersSummary}. You can give any code its own tiers from its page. Pick a customer to restrict a code to them, or leave it blank to let anyone use it.`}
         </s-paragraph>
+        <s-link href="/app/settings">Change default tiers</s-link>
       </s-banner>
 
       <s-section heading="Create a discount code">

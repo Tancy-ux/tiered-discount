@@ -12,13 +12,19 @@ no manual price rule setup per order size.
   It reads the cart subtotal and applies the matching tier's percentage off
   the whole order.
 - **Default tiers** (subtotal thresholds and percentages) are stored in a
-  shop-level metafield (`tiered_discount.config`) and are editable from within
-  the app — changing them doesn't require a redeploy. Every code uses them
-  unless it has its own tiers.
+  shop-level metafield (`tiered_discount.config`) and are edited on the app's
+  **Settings** page — changing them doesn't require a redeploy. Every code
+  uses them unless it has its own tiers. The home page shows the current
+  default tiers.
 - **Custom tiers per code:** on a code's page, tick "Use custom tiers for this
   code" to give that one code different tiers. They're stored on the discount
   itself (`tiered_discount.tiers`). Other codes, and later changes to the
   default tiers, don't affect it. Untick and save to return it to the defaults.
+  The code page has one **Save changes** button that saves the code's details
+  and its tiers together.
+- **Large discounts need a confirmation:** saving any tier above 30% off
+  (Settings, a code's custom tiers, or bulk create) asks the merchant to
+  confirm first, to catch typos like 50 instead of 5.
 - **Bulk create** works the same way: tick "Use custom tiers for these codes"
   and every code in that batch is created with those tiers. Left unticked,
   the codes use the default tiers.
