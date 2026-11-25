@@ -3,7 +3,8 @@ import { useLoaderData, useNavigation, useSearchParams } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
-import { formatMoney, statusBadge } from "../tiers";
+import { statusBadge } from "../tiers";
+import { copyText } from "../clipboard";
 
 const PAGE_SIZE = 50;
 const STATUSES = ["active", "scheduled", "expired"];
@@ -80,10 +81,6 @@ export const loader = async ({ request }) => {
                 status
                 asyncUsageCount
                 usageLimit
-                totalSales {
-                  amount
-                  currencyCode
-                }
                 codes(first: 1) {
                   nodes {
                     code
@@ -136,12 +133,6 @@ export const loader = async ({ request }) => {
         customTiers: Boolean(node.codeTiers),
         used: discount.asyncUsageCount,
         usageLimit: discount.usageLimit,
-        sales: discount.totalSales
-          ? formatMoney(
-              discount.totalSales.amount,
-              discount.totalSales.currencyCode,
-            )
-          : "—",
       };
     });
 
@@ -188,12 +179,8 @@ export default function Discounts() {
   };
 
   const handleCopy = async (code) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      shopify.toast.show("Code copied");
-    } catch {
-      shopify.toast.show("Couldn't copy code", { isError: true });
-    }
+    if (await copyText(code)) shopify.toast.show("Code copied");
+    else shopify.toast.show("Couldn't copy code", { isError: true });
   };
 
   const isFiltered = Boolean(search) || status !== "all";
@@ -259,7 +246,6 @@ export default function Discounts() {
                 <s-table-header>Customer</s-table-header>
                 <s-table-header>Tiers</s-table-header>
                 <s-table-header>Used</s-table-header>
-                <s-table-header>Sales</s-table-header>
                 <s-table-header>Status</s-table-header>
               </s-table-header-row>
               <s-table-body>
@@ -306,7 +292,6 @@ export default function Discounts() {
                           ? `${row.used} of ${row.usageLimit}`
                           : row.used}
                       </s-table-cell>
-                      <s-table-cell>{row.sales}</s-table-cell>
                       <s-table-cell>
                         <s-badge tone={badge.tone} icon={badge.icon}>
                           {badge.label}
@@ -341,7 +326,7 @@ export default function Discounts() {
           )}
 
           <s-text color="subdued">
-            Usage and sales can take a few minutes to update after an order.
+            Usage can take a few minutes to update after an order.
           </s-text>
         </s-stack>
       </s-section>

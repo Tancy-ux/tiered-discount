@@ -24,7 +24,6 @@ import {
   hasLargeDiscount,
   largeDiscountText,
   describeTiers,
-  formatMoney,
   readTiers,
   statusBadge,
   tiersForSubmit,
@@ -36,6 +35,7 @@ import {
   setCustomerLock,
 } from "../discount-metafields.server";
 import { isoToShopDate, shopDateToIso } from "../dates";
+import { copyText } from "../clipboard";
 
 /** "2026-12-31" → "31 Dec 2026" */
 function readableDate(dateString) {
@@ -158,10 +158,6 @@ export const loader = async ({ params, request }) => {
               usageLimit
               appliesOncePerCustomer
               asyncUsageCount
-              totalSales {
-                amount
-                currencyCode
-              }
               codes(first: 1) {
                 nodes {
                   code
@@ -241,12 +237,6 @@ export const loader = async ({ params, request }) => {
     endsAt: isoToShopDate(discount.endsAt, data.shop.ianaTimezone),
     usageLimit: discount.usageLimit,
     used: discount.asyncUsageCount,
-    sales: discount.totalSales
-      ? formatMoney(
-          discount.totalSales.amount,
-          discount.totalSales.currencyCode,
-        )
-      : null,
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
     customer,
     defaultTiers,
@@ -655,12 +645,8 @@ export default function DiscountDetail() {
   };
 
   const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      shopify.toast.show("Code copied");
-    } catch {
-      shopify.toast.show("Couldn't copy code", { isError: true });
-    }
+    if (await copyText(code)) shopify.toast.show("Code copied");
+    else shopify.toast.show("Couldn't copy code", { isError: true });
   };
 
   // confirmed: true once the merchant has accepted a large discount.
@@ -692,10 +678,9 @@ export default function DiscountDetail() {
   const badge = statusBadge(loaderData.status);
   const customerMessage = buildCustomerMessage(loaderData);
   const handleCopyMessage = async () => {
-    try {
-      await navigator.clipboard.writeText(customerMessage.join("\n\n"));
+    if (await copyText(customerMessage.join("\n\n"))) {
       shopify.toast.show("Message copied");
-    } catch {
+    } else {
       shopify.toast.show("Couldn't copy message", { isError: true });
     }
   };
@@ -852,12 +837,8 @@ export default function DiscountDetail() {
                 : `${loaderData.used} ${loaderData.used === 1 ? "time" : "times"}`}
             </s-text>
           </s-stack>
-          <s-stack direction="block" gap="none">
-            <s-text color="subdued">Sales from this code</s-text>
-            <s-text type="strong">{loaderData.sales ?? "—"}</s-text>
-          </s-stack>
           <s-text color="subdued">
-            Usage and sales can take a few minutes to update.
+            Usage can take a few minutes to update.
           </s-text>
         </s-stack>
       </s-section>

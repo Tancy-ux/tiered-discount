@@ -47,9 +47,6 @@ export const loader = async ({ request }) => {
                 title
                 status
                 asyncUsageCount
-                totalSales {
-                  amount
-                }
                 codes(first: 1) {
                   nodes {
                     code
@@ -105,13 +102,7 @@ export const loader = async ({ request }) => {
     onboarding: shop.onboarding,
     totalCodes: codes.length,
     timesUsed: `${codes.reduce((sum, node) => sum + (node.discount.asyncUsageCount ?? 0), 0)}${more}`,
-    sales: formatMoney(
-      codes.reduce(
-        (sum, node) => sum + Number(node.discount.totalSales?.amount ?? 0),
-        0,
-      ),
-      shop.currencyCode,
-    ),
+    customerOnly: `${codes.filter((node) => (node.discount.context?.customers ?? []).length > 0).length}${more}`,
     // Newest first (the query is reversed).
     recentCodes: codes.slice(0, 4).map((node) => ({
       id: legacyId(node.id),
@@ -180,7 +171,7 @@ export default function Home() {
     totalCodes,
     activeLabel,
     timesUsed,
-    sales,
+    customerOnly,
     recentCodes,
     functionId,
   } = useLoaderData();
@@ -299,8 +290,8 @@ export default function Home() {
             <s-heading>{timesUsed}</s-heading>
           </s-stack>
           <s-stack direction="block" gap="none">
-            <s-text color="subdued">Sales from codes</s-text>
-            <s-heading>{sales}</s-heading>
+            <s-text color="subdued">Customer-only codes</s-text>
+            <s-heading>{customerOnly}</s-heading>
           </s-stack>
         </s-grid>
       </s-section>

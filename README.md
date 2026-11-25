@@ -48,10 +48,15 @@ no manual price rule setup per order size.
 - **Codes list:** search by code, filter by status (Active, Scheduled,
   Paused or ended), and page through all codes 50 at a time with
   Previous/Next. Each row shows how many times the code was used (and the
-  limit, if set) and the sales from orders that used it.
-- **Results on each code:** a code's page shows times used and sales from
-  orders using the code (Shopify's `asyncUsageCount` and `totalSales`). Both
-  can take a few minutes to update after an order.
+  limit, if set). Each code has a copy button.
+- **Results on each code:** a code's page shows how many times it was used
+  (Shopify's `asyncUsageCount`, which can take a few minutes to update).
+  Sales and who used a code aren't shown: Shopify leaves `totalSales` empty
+  for app-made discounts, and reading the orders themselves would need the
+  `read_orders` permission, which the app doesn't ask for.
+- **Copy buttons** (code, codes list, customer message) work inside the
+  Shopify admin frame, where the browser's clipboard API is often blocked:
+  they copy through a hidden text box first (`app/clipboard.js`).
 - **Suggested codes:** picking a customer on the Create code page suggests a code
   from the store's name and the customer's first name, e.g. "Ware
   Innovations" + "Priya Shah" → `WARE-PRIYA`.
@@ -70,7 +75,7 @@ no manual price rule setup per order size.
     from the store's data; "Test it at checkout" is marked by the merchant.
     **Hide guide** removes it for good. Progress is stored in the shop
     metafield `tiered_discount.onboarding`.
-  - **At a glance:** active codes, times used and sales from codes, added up
+  - **At a glance:** active codes, times used and customer-only codes, added up
     over the newest 100 app codes ("+" when there are more).
   - **Your default tiers** as a short list, with **Check a cart amount**: type
     an amount to see which tier it reaches, what it saves and how much more
@@ -79,7 +84,7 @@ no manual price rule setup per order size.
 - **Code page layout:** one field per line (code, then customer; start date,
   then end date) with the status badge next to the code name. A chosen
   customer shows a **Logged-in only** badge and a line saying only they can
-  use the code. The Summary lists who it's for, times used and sales.
+  use the code. The Summary lists who it's for and times used.
 - **More settings:** on the create page and a code's page, total uses, one
   use per customer, combinations and notes sit together in one open section.
 - **Send to customer:** last on a customer-specific code's page, folded away
