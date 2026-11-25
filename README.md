@@ -39,6 +39,11 @@ no manual price rule setup per order size.
   product discounts, other order discounts and shipping discounts (code page
   and bulk create). New codes combine with shipping discounts only. Shopify
   only stacks two discounts when both allow it.
+- **Pause and resume:** a code's page has **Pause code**, which ends the code
+  now but keeps it (Shopify's `discountCodeDeactivate`), and **Resume code**,
+  which makes it usable again with no end date (`discountCodeActivate`). The
+  button is disabled while the page has unsaved changes. Status shows as
+  Active, Scheduled, or Paused or ended.
 - **Suggested codes:** picking a customer on the home page suggests a code
   from the store's name and the customer's first name, e.g. "Ware
   Innovations" + "Priya Shah" → `WARE-PRIYA`.

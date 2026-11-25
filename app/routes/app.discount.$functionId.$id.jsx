@@ -16,6 +16,7 @@ import {
   DEFAULT_TIERS,
   confirmLargeDiscount,
   readTiers,
+  statusBadge,
   tiersForSubmit,
 } from "../tiers";
 import {
@@ -162,6 +163,43 @@ export const action = async ({ params, request }) => {
   const { id } = params;
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  if (intent === "pause" || intent === "resume") {
+    // Pausing ends the code now (Shopify keeps it); resuming makes it
+    // usable again with no end date.
+    const field = intent === "pause" ? "discountCodeDeactivate" : "discountCodeActivate";
+    const response = await admin.graphql(
+      intent === "pause"
+        ? `#graphql
+          mutation PauseCode($id: ID!) {
+            discountCodeDeactivate(id: $id) {
+              userErrors {
+                message
+              }
+            }
+          }`
+        : `#graphql
+          mutation ResumeCode($id: ID!) {
+            discountCodeActivate(id: $id) {
+              userErrors {
+                message
+              }
+            }
+          }`,
+      { variables: { id: `gid://shopify/DiscountCodeNode/${id}` } },
+    );
+    const { data } = await response.json();
+    const userErrors = data?.[field]?.userErrors ?? [];
+    return userErrors.length > 0 || !data?.[field]
+      ? {
+          ok: false,
+          intent,
+          error:
+            userErrors.map((e) => e.message).join(" ") ||
+            "Shopify didn't accept the change.",
+        }
+      : { ok: true, intent };
+  }
 
   if (intent === "delete") {
     const response = await admin.graphql(
@@ -357,6 +395,7 @@ export default function DiscountDetail() {
   const shopify = useAppBridge();
   const detailFetcher = useFetcher();
   const deleteFetcher = useFetcher();
+  const statusFetcher = useFetcher();
 
   const [customer, setCustomer] = useState(
     loaderData.notFound ? null : loaderData.customer,
@@ -401,6 +440,7 @@ export default function DiscountDetail() {
 
   const isSaving = detailFetcher.state !== "idle";
   const isDeleting = deleteFetcher.state !== "idle";
+  const isChangingStatus = statusFetcher.state !== "idle";
 
   const normalizeTiers = (list) => JSON.stringify(tiersForSubmit(list));
   const isTiersDirty =
@@ -439,6 +479,27 @@ export default function DiscountDetail() {
       shopify.toast.show("Discount code updated");
     }
   }, [detailFetcher.data, shopify]);
+
+  // Pausing or resuming changes the saved dates; show them.
+  const savedStartsAt = loaderData.notFound ? "" : loaderData.startsAt;
+  const savedEndsAt = loaderData.notFound ? "" : loaderData.endsAt;
+  useEffect(() => {
+    setStartsAt(savedStartsAt);
+  }, [savedStartsAt]);
+  useEffect(() => {
+    setEndsAt(savedEndsAt);
+  }, [savedEndsAt]);
+
+  useEffect(() => {
+    if (!statusFetcher.data) return;
+    if (statusFetcher.data.ok) {
+      shopify.toast.show(
+        statusFetcher.data.intent === "pause" ? "Code paused" : "Code resumed",
+      );
+    } else {
+      shopify.toast.show(statusFetcher.data.error, { isError: true });
+    }
+  }, [statusFetcher.data, shopify]);
 
   useEffect(() => {
     if (deleteFetcher.data?.ok === false) {
@@ -516,6 +577,21 @@ export default function DiscountDetail() {
         onClick={handleSave}
       >
         Save changes
+      </s-button>
+
+      <s-button
+        slot="secondary-actions"
+        variant="secondary"
+        {...(isChangingStatus || isDirty ? { disabled: true } : {})}
+        {...(isChangingStatus ? { loading: true } : {})}
+        onClick={() =>
+          statusFetcher.submit(
+            { intent: loaderData.status === "EXPIRED" ? "resume" : "pause" },
+            { method: "post" },
+          )
+        }
+      >
+        {loaderData.status === "EXPIRED" ? "Resume code" : "Pause code"}
       </s-button>
 
       <s-button
@@ -604,8 +680,8 @@ export default function DiscountDetail() {
         <s-stack direction="block" gap="base">
           <s-stack direction="block" gap="small-300">
             <s-text color="subdued">Status</s-text>
-            <s-badge tone={loaderData.status === "ACTIVE" ? "success" : "info"}>
-              {loaderData.status}
+            <s-badge tone={statusBadge(loaderData.status).tone}>
+              {statusBadge(loaderData.status).label}
             </s-badge>
           </s-stack>
           <s-stack direction="block" gap="small-300">

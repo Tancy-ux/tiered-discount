@@ -84,3 +84,17 @@ export function confirmLargeDiscount(tiers) {
     `One tier gives ${largest}% off. That's more than ${LARGE_DISCOUNT_PERCENT}%. Save it anyway?`,
   );
 }
+
+/** Shopify discount status → label and badge tone for the admin pages. */
+export function statusBadge(status) {
+  switch (status) {
+    case "ACTIVE":
+      return { label: "Active", tone: "success" };
+    case "SCHEDULED":
+      return { label: "Scheduled", tone: "info" };
+    case "EXPIRED":
+      return { label: "Paused or ended", tone: "neutral" };
+    default:
+      return { label: status ?? "Unknown", tone: "neutral" };
+  }
+}
