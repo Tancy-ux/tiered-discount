@@ -18,9 +18,14 @@ export const action = async ({ request }) => {
         admin,
         `gid://shopify/Customer/${customerId}`,
       );
-      console.log(`customers/redact: removed customer from ${changed} code(s) on ${shop}`);
+      console.log(
+        `customers/redact: removed customer from ${changed} code(s) on ${shop}`,
+      );
     } catch (error) {
-      console.error(`customers/redact: couldn't update codes on ${shop}`, error);
+      console.error(
+        `customers/redact: couldn't update codes on ${shop}`,
+        error,
+      );
     }
   }
 

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFetcher, useLoaderData, redirect } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { hasBadTiers } from "../components/TierEditor";
 import {
   combinesFormFields,
@@ -20,7 +21,8 @@ import {
 } from "../components/DiscountSections";
 import {
   DEFAULT_TIERS,
-  confirmLargeDiscount,
+  hasLargeDiscount,
+  largeDiscountText,
   describeTiers,
   formatMoney,
   readTiers,
@@ -555,6 +557,10 @@ export default function DiscountDetail() {
   );
   // The customer message starts folded away.
   const [messageOpen, setMessageOpen] = useState(false);
+  const [confirmingLarge, setConfirmingLarge] = useState(false);
+  const closeLargeConfirm = useCallback(() => setConfirmingLarge(false), []);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const closeDeleteConfirm = useCallback(() => setConfirmingDelete(false), []);
 
   const isSaving = detailFetcher.state !== "idle";
   const isDeleting = deleteFetcher.state !== "idle";
@@ -645,12 +651,7 @@ export default function DiscountDetail() {
 
   const handleDelete = () => {
     if (isDeleting) return;
-    if (
-      !confirm(`Delete the code "${loaderData.code}"? This can't be undone.`)
-    ) {
-      return;
-    }
-    deleteFetcher.submit({ intent: "delete" }, { method: "post" });
+    setConfirmingDelete(true);
   };
 
   const handleCopyCode = async () => {
@@ -662,9 +663,13 @@ export default function DiscountDetail() {
     }
   };
 
-  const handleSave = () => {
+  // confirmed: true once the merchant has accepted a large discount.
+  const handleSave = (confirmed = false) => {
     if (!canSave) return;
-    if (useCustomTiers && !confirmLargeDiscount(customTiersDraft)) return;
+    if (!confirmed && useCustomTiers && hasLargeDiscount(customTiersDraft)) {
+      setConfirmingLarge(true);
+      return;
+    }
     detailFetcher.submit(
       {
         code: code.trim(),
@@ -709,10 +714,40 @@ export default function DiscountDetail() {
         variant="primary"
         {...(canSave ? {} : { disabled: true })}
         {...(isSaving ? { loading: true } : {})}
-        onClick={handleSave}
+        onClick={() => handleSave()}
       >
         Save changes
       </s-button>
+
+      <ConfirmModal
+        id="large-discount"
+        open={confirmingLarge}
+        heading="Save a large discount?"
+        confirmLabel="Save anyway"
+        onConfirm={() => {
+          setConfirmingLarge(false);
+          handleSave(true);
+        }}
+        onCancel={closeLargeConfirm}
+      >
+        {largeDiscountText(customTiersDraft)}
+      </ConfirmModal>
+
+      <ConfirmModal
+        id="delete-code"
+        open={confirmingDelete}
+        heading={`Delete ${loaderData.code}?`}
+        confirmLabel="Delete code"
+        destructive
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          deleteFetcher.submit({ intent: "delete" }, { method: "post" });
+        }}
+        onCancel={closeDeleteConfirm}
+      >
+        The code stops working right away and can&apos;t be brought back.
+        Customers who have it will no longer get the discount.
+      </ConfirmModal>
 
       <s-button
         slot="secondary-actions"

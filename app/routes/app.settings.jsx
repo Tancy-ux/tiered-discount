@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { TierEditor, hasBadTiers } from "../components/TierEditor";
-import { confirmLargeDiscount, describeTiers, tiersForSubmit } from "../tiers";
+import {
+  describeTiers,
+  hasLargeDiscount,
+  largeDiscountText,
+  tiersForSubmit,
+} from "../tiers";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { cleanTiers } from "../discount-metafields.server";
 import { loadShop, saveDefaultTiers } from "../shop.server";
 
@@ -48,10 +54,19 @@ export default function Settings() {
     !hasSavedTiers ||
     JSON.stringify(tiersForSubmit(tiers)) !==
       JSON.stringify(tiersForSubmit(defaultTiers));
-  const canSave = isDirty && !isSaving && tiers.length > 0 && !hasBadTiers(tiers);
+  const canSave =
+    isDirty && !isSaving && tiers.length > 0 && !hasBadTiers(tiers);
 
-  const handleSave = () => {
-    if (!canSave || !confirmLargeDiscount(tiers)) return;
+  const [confirmingLarge, setConfirmingLarge] = useState(false);
+  const closeLargeConfirm = useCallback(() => setConfirmingLarge(false), []);
+
+  // confirmed: true once the merchant has accepted a large discount.
+  const handleSave = (confirmed = false) => {
+    if (!canSave) return;
+    if (!confirmed && hasLargeDiscount(tiers)) {
+      setConfirmingLarge(true);
+      return;
+    }
     fetcher.submit(
       { tiers: JSON.stringify(tiersForSubmit(tiers)) },
       { method: "post" },
@@ -65,10 +80,24 @@ export default function Settings() {
         variant="primary"
         {...(canSave ? {} : { disabled: true })}
         {...(isSaving ? { loading: true } : {})}
-        onClick={handleSave}
+        onClick={() => handleSave()}
       >
         Save
       </s-button>
+
+      <ConfirmModal
+        id="large-discount"
+        open={confirmingLarge}
+        heading="Save a large discount?"
+        confirmLabel="Save anyway"
+        onConfirm={() => {
+          setConfirmingLarge(false);
+          handleSave(true);
+        }}
+        onCancel={closeLargeConfirm}
+      >
+        {largeDiscountText(tiers)}
+      </ConfirmModal>
 
       {fetcher.data?.ok === false && (
         <s-banner tone="critical" heading="Couldn't save tiers">
@@ -83,7 +112,11 @@ export default function Settings() {
           </s-paragraph>
 
           {!hasSavedTiers && (
-            <s-box padding="small-200 base" background="subdued" borderRadius="base">
+            <s-box
+              padding="small-200 base"
+              background="subdued"
+              borderRadius="base"
+            >
               <s-text color="subdued">
                 {`You haven't saved your own tiers yet, so codes use the built-in ones: ${describeTiers(defaultTiers, currencyCode)}. Save to keep these or change them.`}
               </s-text>

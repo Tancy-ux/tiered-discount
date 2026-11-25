@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useFetcher,
   useLoaderData,
@@ -23,7 +23,8 @@ import {
   datesProblems,
   usageLimitProblem,
 } from "../components/DiscountSections";
-import { confirmLargeDiscount, tiersForSubmit } from "../tiers";
+import { hasLargeDiscount, largeDiscountText, tiersForSubmit } from "../tiers";
+import { ConfirmModal } from "../components/ConfirmModal";
 import {
   NAMESPACE,
   cleanTiers,
@@ -194,9 +195,16 @@ export default function NewDiscount() {
       setCode(suggestCode(codePrefix, picked.displayName));
   };
 
-  const handleSave = () => {
+  const [confirmingLarge, setConfirmingLarge] = useState(false);
+  const closeLargeConfirm = useCallback(() => setConfirmingLarge(false), []);
+
+  // confirmed: true once the merchant has accepted a large discount.
+  const handleSave = (confirmed = false) => {
     if (!canSave) return;
-    if (useCustomTiers && !confirmLargeDiscount(tiers)) return;
+    if (!confirmed && useCustomTiers && hasLargeDiscount(tiers)) {
+      setConfirmingLarge(true);
+      return;
+    }
     fetcher.submit(
       {
         code: code.trim(),
@@ -224,10 +232,25 @@ export default function NewDiscount() {
         variant="primary"
         {...(canSave ? {} : { disabled: true })}
         {...(isSaving ? { loading: true } : {})}
-        onClick={handleSave}
+        onClick={() => handleSave()}
       >
         Create code
       </s-button>
+
+      <ConfirmModal
+        id="large-discount"
+        open={confirmingLarge}
+        heading="Save a large discount?"
+        confirmLabel="Save anyway"
+        onConfirm={() => {
+          setConfirmingLarge(false);
+          handleSave(true);
+        }}
+        onCancel={closeLargeConfirm}
+      >
+        {largeDiscountText(tiers)}
+      </ConfirmModal>
+
       <s-button slot="secondary-actions" href="/app">
         Cancel
       </s-button>

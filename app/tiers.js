@@ -76,13 +76,13 @@ export function hasLargeDiscount(tiers) {
   );
 }
 
-/** Asks the merchant to confirm unusually large discounts. Browser only. */
-export function confirmLargeDiscount(tiers) {
-  if (!hasLargeDiscount(tiers)) return true;
-  const largest = Math.max(...tiersForSubmit(tiers).map((t) => t.percentage));
-  return window.confirm(
-    `One tier gives ${largest}% off. That's more than ${LARGE_DISCOUNT_PERCENT}%. Save it anyway?`,
+/** Text for the large-discount confirmation modal. */
+export function largeDiscountText(tiers) {
+  const largest = Math.max(
+    0,
+    ...tiersForSubmit(tiers).map((t) => t.percentage),
   );
+  return `One tier gives ${largest}% off, which is more than ${LARGE_DISCOUNT_PERCENT}%. Check it isn't a typo (like 50 instead of 5) before saving.`;
 }
 
 /** Shopify discount status → label, badge tone and icon for the admin pages. */

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -11,16 +11,15 @@ import {
   readCombines,
 } from "../components/CombineOptions";
 import { CombinesSection } from "../components/DiscountSections";
+import { ConfirmModal } from "../components/ConfirmModal";
 import {
   DEFAULT_TIERS,
-  confirmLargeDiscount,
+  hasLargeDiscount,
+  largeDiscountText,
   readTiers,
   tiersForSubmit,
 } from "../tiers";
-import {
-  cleanTiers,
-  codeTiersMetafields,
-} from "../discount-metafields.server";
+import { cleanTiers, codeTiersMetafields } from "../discount-metafields.server";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
 const MAX_CODES_PER_SUBMIT = 100;
@@ -150,9 +149,16 @@ export default function BulkCreate() {
 
   const tiersInvalid = useCustomTiers && hasBadTiers(tiers);
 
-  const handleSubmit = () => {
+  const [confirmingLarge, setConfirmingLarge] = useState(false);
+  const closeLargeConfirm = useCallback(() => setConfirmingLarge(false), []);
+
+  // confirmed: true once the merchant has accepted a large discount.
+  const handleSave = (confirmed = false) => {
     if (!codesText.trim() || isSubmitting || tiersInvalid) return;
-    if (useCustomTiers && !confirmLargeDiscount(tiers)) return;
+    if (!confirmed && useCustomTiers && hasLargeDiscount(tiers)) {
+      setConfirmingLarge(true);
+      return;
+    }
     fetcher.submit(
       {
         codes: codesText,
@@ -170,10 +176,24 @@ export default function BulkCreate() {
         Back to discount codes
       </s-link>
 
+      <ConfirmModal
+        id="large-discount"
+        open={confirmingLarge}
+        heading="Save a large discount?"
+        confirmLabel="Save anyway"
+        onConfirm={() => {
+          setConfirmingLarge(false);
+          handleSave(true);
+        }}
+        onCancel={closeLargeConfirm}
+      >
+        {largeDiscountText(tiers)}
+      </ConfirmModal>
+
       <s-section heading="Create multiple codes">
         <s-paragraph>
-          Codes made here can be used by anyone who has them. To make a code
-          for one customer, use Create code instead.
+          Codes made here can be used by anyone who has them. To make a code for
+          one customer, use Create code instead.
         </s-paragraph>
 
         {fetcher.data?.ok === false && (
@@ -229,7 +249,9 @@ export default function BulkCreate() {
           {useCustomTiers ? (
             <>
               <s-paragraph>
-                {"Every code in this batch gets these tiers. Changing the default tiers later won't affect them, and you can still change any one code from its own page."}
+                {
+                  "Every code in this batch gets these tiers. Changing the default tiers later won't affect them, and you can still change any one code from its own page."
+                }
               </s-paragraph>
               <TierEditor
                 tiers={tiers}
@@ -239,7 +261,11 @@ export default function BulkCreate() {
             </>
           ) : (
             <>
-              <s-box padding="small-200 base" background="subdued" borderRadius="base">
+              <s-box
+                padding="small-200 base"
+                background="subdued"
+                borderRadius="base"
+              >
                 <TierSummary tiers={defaultTiers} currencyCode={currencyCode} />
               </s-box>
               <s-stack direction="inline" gap="small-200" alignItems="center">
@@ -258,7 +284,7 @@ export default function BulkCreate() {
             ? { disabled: true }
             : {})}
           {...(isSubmitting ? { loading: true } : {})}
-          onClick={handleSubmit}
+          onClick={() => handleSave()}
         >
           {useCustomTiers ? "Create codes with custom tiers" : "Create codes"}
         </s-button>

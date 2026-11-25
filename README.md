@@ -23,8 +23,9 @@ no manual price rule setup per order size.
   The code page has one **Save changes** button that saves the code's details
   and its tiers together.
 - **Large discounts need a confirmation:** saving any tier above 30% off
-  (Settings, a code's custom tiers, or bulk create) asks the merchant to
-  confirm first, to catch typos like 50 instead of 5.
+  (Settings, a code's custom tiers, the create page or bulk create) opens a
+  confirmation first, to catch typos like 50 instead of 5. Deleting a code
+  asks too. Both use Shopify's modal component, not the browser's confirm().
 - **Tier checks:** a discount must be 0–100%, and no two tiers can use the
   same cart subtotal (the field shows an error and saving is blocked).
 - **Currency:** tier amounts are in the store's currency, shown next to each

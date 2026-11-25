@@ -113,8 +113,9 @@ export const loader = async ({ request }) => {
   const { data } = await response.json();
 
   const tieredFunction =
-    data.shopifyFunctions.nodes.find((node) => node.title === "Tiered order discount") ??
-    data.shopifyFunctions.nodes[0];
+    data.shopifyFunctions.nodes.find(
+      (node) => node.title === "Tiered order discount",
+    ) ?? data.shopifyFunctions.nodes[0];
 
   // "type:app" also returns other apps' discounts; keep only this app's codes.
   const appId = data.currentAppInstallation.app.id;
@@ -130,12 +131,16 @@ export const loader = async ({ request }) => {
         id: legacyId(node.id),
         code: discount.codes.nodes[0]?.code ?? discount.title,
         status: discount.status,
-        customerName: discount.context?.customers?.[0]?.displayName ?? "Any customer",
+        customerName:
+          discount.context?.customers?.[0]?.displayName ?? "Any customer",
         customTiers: Boolean(node.codeTiers),
         used: discount.asyncUsageCount,
         usageLimit: discount.usageLimit,
         sales: discount.totalSales
-          ? formatMoney(discount.totalSales.amount, discount.totalSales.currencyCode)
+          ? formatMoney(
+              discount.totalSales.amount,
+              discount.totalSales.currencyCode,
+            )
           : "—",
       };
     });
@@ -213,7 +218,6 @@ export default function Discounts() {
 
       <s-section heading="Codes">
         <s-stack direction="block" gap="base">
-
           <s-stack direction="inline" gap="base" alignItems="end">
             <s-search-field
               label="Search codes"
@@ -221,7 +225,8 @@ export default function Discounts() {
               value={searchText}
               onInput={(event) => setSearchText(event.currentTarget.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") applyFilters({ q: searchText.trim() });
+                if (event.key === "Enter")
+                  applyFilters({ q: searchText.trim() });
               }}
             ></s-search-field>
             <s-button onClick={() => applyFilters({ q: searchText.trim() })}>
@@ -263,9 +268,15 @@ export default function Discounts() {
                   return (
                     <s-table-row key={row.id}>
                       <s-table-cell>
-                        <s-stack direction="inline" gap="small-300" alignItems="center">
+                        <s-stack
+                          direction="inline"
+                          gap="small-300"
+                          alignItems="center"
+                        >
                           {functionId ? (
-                            <s-link href={`/app/discount/${functionId}/${row.id}`}>
+                            <s-link
+                              href={`/app/discount/${functionId}/${row.id}`}
+                            >
                               {row.code}
                             </s-link>
                           ) : (
@@ -283,7 +294,9 @@ export default function Discounts() {
                       <s-table-cell>{row.customerName}</s-table-cell>
                       <s-table-cell>
                         {row.customTiers ? (
-                          <s-badge tone="accent" icon="wand">Custom</s-badge>
+                          <s-badge tone="accent" icon="wand">
+                            Custom
+                          </s-badge>
                         ) : (
                           "Default"
                         )}
@@ -309,13 +322,17 @@ export default function Discounts() {
           {(pageInfo.hasPreviousPage || pageInfo.hasNextPage) && (
             <s-stack direction="inline" gap="base">
               <s-button
-                {...(pageInfo.hasPreviousPage && !isLoading ? {} : { disabled: true })}
+                {...(pageInfo.hasPreviousPage && !isLoading
+                  ? {}
+                  : { disabled: true })}
                 onClick={() => goToPage("previous")}
               >
                 Previous
               </s-button>
               <s-button
-                {...(pageInfo.hasNextPage && !isLoading ? {} : { disabled: true })}
+                {...(pageInfo.hasNextPage && !isLoading
+                  ? {}
+                  : { disabled: true })}
                 onClick={() => goToPage("next")}
               >
                 Next
