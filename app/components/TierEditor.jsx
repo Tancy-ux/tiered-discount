@@ -122,7 +122,7 @@ export function TierSummary({ tiers, currencyCode }) {
               ? "Any order"
               : `${formatMoney(tier.minSubtotal, currencyCode)} and up`}
           </s-text>
-          <s-badge tone="success">{`${tier.percentage}% off`}</s-badge>
+          <s-badge>{`${tier.percentage}% off`}</s-badge>
         </s-stack>
       ))}
     </s-stack>

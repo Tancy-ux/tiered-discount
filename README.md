@@ -79,7 +79,7 @@ no manual price rule setup per order size.
   read-only tiers show as a short list ("₹50,000 and up → 7.5% off").
   Colour is kept to meaning: status badges are green (Active), yellow
   (Scheduled) or grey (Paused or ended) with an icon, tier discounts show as
-  green pills, and the Custom tiers badge uses Shopify's accent purple. Notes
+  grey pills, and the Custom tiers badge uses Shopify's accent purple. Notes
   that used light-blue info banners are plain grey boxes.
 - **Customer-specific codes only work for that customer, signed in.** The app
   stores the allowed customer IDs on the discount (`tiered_discount.customer_id`)
