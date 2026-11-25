@@ -17,9 +17,19 @@ import {
   setCodeTiers,
   setCustomerLock,
 } from "../discount-metafields.server";
+import { isoToShopDate, shopDateToIso } from "../dates";
 
-function toDateInputValue(isoString) {
-  return isoString ? isoString.slice(0, 10) : "";
+async function loadShopTimeZone(admin) {
+  const response = await admin.graphql(
+    `#graphql
+      query ShopTimeZone {
+        shop {
+          ianaTimezone
+        }
+      }`,
+  );
+  const { data } = await response.json();
+  return data?.shop?.ianaTimezone ?? "UTC";
 }
 
 export const loader = async ({ params, request }) => {
@@ -82,6 +92,7 @@ export const loader = async ({ params, request }) => {
         }
         shop {
           id
+          ianaTimezone
           metafield(namespace: "tiered_discount", key: "config") {
             id
             value
@@ -121,8 +132,9 @@ export const loader = async ({ params, request }) => {
     code: discount.codes.nodes[0]?.code ?? discount.title,
     status: discount.status,
     combinesWithShipping: discount.combinesWith.shippingDiscounts,
-    startsAt: discount.startsAt,
-    endsAt: discount.endsAt,
+    // Dates as the merchant sees them, in the shop's time zone.
+    startsAt: isoToShopDate(discount.startsAt, data.shop.ianaTimezone),
+    endsAt: isoToShopDate(discount.endsAt, data.shop.ianaTimezone),
     usageLimit: discount.usageLimit,
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
     customer,
@@ -169,8 +181,14 @@ export const action = async ({ params, request }) => {
   const previousCustomerId =
     formData.get("previousCustomerId")?.toString().trim() ?? "";
   const combinesWithShipping = formData.get("combinesWithShipping") === "true";
-  const startsAt = formData.get("startsAt")?.toString() ?? "";
-  const endsAt = formData.get("endsAt")?.toString() ?? "";
+  // Dates are only sent when the merchant changed them, so saving other
+  // details never moves a code's existing start or end time.
+  const startsAt = formData.has("startsAt")
+    ? (formData.get("startsAt")?.toString() ?? "")
+    : null;
+  const endsAt = formData.has("endsAt")
+    ? (formData.get("endsAt")?.toString() ?? "")
+    : null;
   const usageLimitRaw = formData.get("usageLimit")?.toString().trim() ?? "";
   const appliesOncePerCustomer =
     formData.get("appliesOncePerCustomer") === "true";
@@ -193,6 +211,14 @@ export const action = async ({ params, request }) => {
     const { tiers, error } = cleanTiers(formData.get("tiers")?.toString());
     if (error) return { ok: false, intent: "updateDiscount", error };
     customTiers = tiers;
+  }
+
+  const timeZone =
+    startsAt || endsAt ? await loadShopTimeZone(admin) : "UTC";
+  const dates = {};
+  if (startsAt) dates.startsAt = shopDateToIso(startsAt, timeZone);
+  if (endsAt !== null) {
+    dates.endsAt = endsAt ? shopDateToIso(endsAt, timeZone, true) : null;
   }
 
   let context;
@@ -232,8 +258,7 @@ export const action = async ({ params, request }) => {
             productDiscounts: false,
             shippingDiscounts: combinesWithShipping,
           },
-          startsAt: startsAt ? `${startsAt}T00:00:00Z` : undefined,
-          endsAt: endsAt ? `${endsAt}T00:00:00Z` : null,
+          ...dates,
           usageLimit: usageLimitRaw ? Number(usageLimitRaw) : null,
           appliesOncePerCustomer,
           ...(context ? { context } : {}),
@@ -332,10 +357,10 @@ export default function DiscountDetail() {
     loaderData.notFound ? true : loaderData.combinesWithShipping,
   );
   const [startsAt, setStartsAt] = useState(
-    loaderData.notFound ? "" : toDateInputValue(loaderData.startsAt),
+    loaderData.notFound ? "" : loaderData.startsAt,
   );
   const [endsAt, setEndsAt] = useState(
-    loaderData.notFound ? "" : toDateInputValue(loaderData.endsAt),
+    loaderData.notFound ? "" : loaderData.endsAt,
   );
   const [usageLimit, setUsageLimit] = useState(
     loaderData.notFound ? "" : (loaderData.usageLimit ?? ""),
@@ -381,8 +406,8 @@ export default function DiscountDetail() {
     ((customer?.id ?? null) !== (loaderData.customer?.id ?? null) ||
       code.trim() !== loaderData.code ||
       combinesWithShipping !== loaderData.combinesWithShipping ||
-      startsAt !== toDateInputValue(loaderData.startsAt) ||
-      endsAt !== toDateInputValue(loaderData.endsAt) ||
+      startsAt !== loaderData.startsAt ||
+      endsAt !== loaderData.endsAt ||
       String(usageLimit) !== String(loaderData.usageLimit ?? "") ||
       appliesOncePerCustomer !== loaderData.appliesOncePerCustomer ||
       notes !== (loaderData.notes ?? "") ||
@@ -391,7 +416,14 @@ export default function DiscountDetail() {
   const tiersInvalid =
     useCustomTiers &&
     (customTiersDraft.length === 0 || hasBadTiers(customTiersDraft));
-  const canSave = Boolean(code.trim()) && isDirty && !isSaving && !tiersInvalid;
+  // Same-format date strings ("YYYY-MM-DD") compare correctly as text.
+  const datesInvalid = Boolean(startsAt && endsAt && endsAt < startsAt);
+  const canSave =
+    Boolean(code.trim()) &&
+    isDirty &&
+    !isSaving &&
+    !tiersInvalid &&
+    !datesInvalid;
 
   useEffect(() => {
     if (detailFetcher.data?.ok) {
@@ -448,8 +480,8 @@ export default function DiscountDetail() {
         customerId: customer?.id ?? "",
         previousCustomerId: loaderData.customer?.id ?? "",
         combinesWithShipping: String(combinesWithShipping),
-        startsAt,
-        endsAt,
+        ...(startsAt !== loaderData.startsAt ? { startsAt } : {}),
+        ...(endsAt !== loaderData.endsAt ? { endsAt } : {}),
         usageLimit: String(usageLimit),
         appliesOncePerCustomer: String(appliesOncePerCustomer),
         notes,
@@ -604,6 +636,10 @@ export default function DiscountDetail() {
           ></s-date-field>
           <s-date-field
             label="End date (optional)"
+            details="The code works until the end of this day."
+            {...(datesInvalid
+              ? { error: "End date must be on or after the start date" }
+              : {})}
             value={endsAt}
             onChange={(event) => setEndsAt(event.currentTarget.value)}
           ></s-date-field>

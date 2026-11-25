@@ -104,6 +104,9 @@ export function cleanTiers(raw) {
     return { error: "Each discount must be between 0 and 100%." };
   }
   tiers.sort((a, b) => a.minSubtotal - b.minSubtotal);
+  if (tiers.some((t, i) => i > 0 && t.minSubtotal === tiers[i - 1].minSubtotal)) {
+    return { error: "Two tiers have the same cart subtotal. Give each tier a different amount." };
+  }
   return { tiers };
 }
 

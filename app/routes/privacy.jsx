@@ -12,7 +12,8 @@ export default function Privacy() {
       }}
     >
       <h1>Privacy Policy - Ware - Tiered Discounts</h1>
-      <p>Last updated: {new Date().toISOString().slice(0, 10)}</p>
+      {/* Change this date whenever the policy text changes. */}
+      <p>Last updated: 25 November 2026</p>
 
       <p>
         This app lets merchants create discount codes that apply a tiered

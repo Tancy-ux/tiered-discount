@@ -13,10 +13,11 @@ import { describeTiers } from "../tiers";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
 
-function suggestCode(displayName) {
+// "Ware Innovations" + "Priya Shah" → "WARE-PRIYA"
+function suggestCode(codePrefix, displayName) {
   const firstName = (displayName ?? "").trim().split(/\s+/)[0] ?? "";
-  const cleaned = firstName.replace(/[^a-zA-Z]/g, "").toUpperCase();
-  return cleaned ? `WARE-${cleaned}` : "";
+  const cleaned = firstName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return cleaned ? `${codePrefix}${cleaned}` : "";
 }
 
 function legacyId(gid) {
@@ -79,10 +80,11 @@ export const loader = async ({ request }) => {
       (node) => node.title === "Tiered order discount",
     ) ?? data.shopifyFunctions.nodes[0];
 
-  const { defaultTiers, currencyCode } = await loadShop(admin);
+  const { defaultTiers, currencyCode, codePrefix } = await loadShop(admin);
 
   return {
     tiersSummary: describeTiers(defaultTiers, currencyCode),
+    codePrefix,
     totalCodes: codes.length,
     activeCodes: codes.filter((node) => node.discount.status === "ACTIVE")
       .length,
@@ -153,7 +155,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Home() {
-  const { tiersSummary, totalCodes, activeCodes, functionId } =
+  const { tiersSummary, codePrefix, totalCodes, activeCodes, functionId } =
     useLoaderData();
   const createFetcher = useFetcher();
   const shopify = useAppBridge();
@@ -179,7 +181,7 @@ export default function Home() {
   const handleSelectCustomer = (customer) => {
     setSelectedCustomer(customer);
     if (customer && !code.trim()) {
-      setCode(suggestCode(customer.displayName));
+      setCode(suggestCode(codePrefix, customer.displayName));
     }
   };
 

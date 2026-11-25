@@ -195,7 +195,7 @@ export default function BulkCreate() {
           <s-text-area
             label="Codes"
             labelAccessibilityVisibility="exclusive"
-            placeholder={"One code per line, e.g.\nWARE-SUMMER25\nWARE-VIP01\nWARE-VIP02"}
+            placeholder={"One code per line, e.g.\nSUMMER25\nVIP01\nVIP02"}
             rows={10}
             value={codesText}
             onInput={(event) => setCodesText(event.currentTarget.value)}

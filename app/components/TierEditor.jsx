@@ -9,9 +9,20 @@ export function isBadPercentage(value) {
   return !Number.isFinite(number) || number < 0 || number > 100;
 }
 
-/** True when any tier has a discount outside 0-100%, so saving is blocked. */
+/** True when this tier's cart subtotal is already used by an earlier tier. */
+export function isDuplicateSubtotal(tiers, index) {
+  const amount = Number(tiers[index].minSubtotal) || 0;
+  return tiers
+    .slice(0, index)
+    .some((tier) => (Number(tier.minSubtotal) || 0) === amount);
+}
+
+/** True when any tier is invalid, so saving is blocked. */
 export function hasBadTiers(tiers) {
-  return tiers.some((tier) => isBadPercentage(tier.percentage));
+  return tiers.some(
+    (tier, index) =>
+      isBadPercentage(tier.percentage) || isDuplicateSubtotal(tiers, index),
+  );
 }
 
 export function TierEditor({ tiers, onChange, disabled = false }) {
@@ -37,6 +48,9 @@ export function TierEditor({ tiers, onChange, disabled = false }) {
             label="Cart subtotal at or above"
             min={0}
             {...(disabled ? { disabled: true } : {})}
+            {...(!disabled && isDuplicateSubtotal(tiers, index)
+              ? { error: "Another tier already uses this amount" }
+              : {})}
             value={String(tier.minSubtotal)}
             onInput={(event) =>
               handleTierChange(index, "minSubtotal", event.currentTarget.value)

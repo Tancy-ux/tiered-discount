@@ -3,12 +3,20 @@
 
 import { DEFAULT_TIERS, readTiers } from "./tiers";
 
+/** First word of the shop name as a code prefix: "Ware Innovations" → "WARE-". */
+function codePrefixFor(shopName) {
+  const word = (shopName ?? "").trim().split(/\s+/)[0] ?? "";
+  const cleaned = word.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 12);
+  return cleaned ? `${cleaned}-` : "";
+}
+
 export async function loadShop(admin) {
   const response = await admin.graphql(
     `#graphql
       query ShopSettings {
         shop {
           id
+          name
           currencyCode
           config: metafield(namespace: "tiered_discount", key: "config") {
             value
@@ -22,6 +30,7 @@ export async function loadShop(admin) {
   return {
     shopId: data.shop.id,
     currencyCode: data.shop.currencyCode,
+    codePrefix: codePrefixFor(data.shop.name),
     defaultTiers: savedTiers ?? DEFAULT_TIERS,
     hasSavedTiers: savedTiers != null,
   };
