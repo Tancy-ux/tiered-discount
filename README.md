@@ -33,8 +33,8 @@ no manual price rule setup per order size.
   ₹50,000 tier is reached by the same cart value in USD, EUR, etc.
 - **Dates use the store's time zone.** A start date begins at 00:00 and an end
   date lasts until 23:59:59 on that day, in the time zone set in the store's
-  Shopify settings. The end date can't be before the start date. Saving other
-  details on a code never moves its existing dates.
+  Shopify settings. A code must have a start date, and the end date can't be
+  before it. Saving other details on a code never moves its existing dates.
 - **Combining with other discounts:** each code can be allowed to combine with
   product discounts, other order discounts and shipping discounts (code page
   and bulk create). New codes combine with shipping discounts only. Shopify
@@ -44,6 +44,13 @@ no manual price rule setup per order size.
   which makes it usable again with no end date (`discountCodeActivate`). The
   button is disabled while the page has unsaved changes. Status shows as
   Active, Scheduled, or Paused or ended.
+- **Codes list:** search by code, filter by status (Active, Scheduled,
+  Paused or ended), and page through all codes 50 at a time with
+  Previous/Next. Each row shows how many times the code was used (and the
+  limit, if set) and the sales from orders that used it.
+- **Results on each code:** a code's page shows times used and sales from
+  orders using the code (Shopify's `asyncUsageCount` and `totalSales`). Both
+  can take a few minutes to update after an order.
 - **Suggested codes:** picking a customer on the home page suggests a code
   from the store's name and the customer's first name, e.g. "Ware
   Innovations" + "Priya Shah" → `WARE-PRIYA`.
@@ -130,10 +137,10 @@ with a discount above 100% is ignored, so a bad value never breaks checkout.
 - **One customer per code from the app.** The code page picks a single
   customer. The Function accepts several (comma-separated IDs) if a code was
   given more customers some other way.
-- **The codes list and home-page counts read the newest 100 app discounts on
-  the store**, including other apps' discounts that are then filtered out. On a
-  store with more than 100, older codes don't show in the list (they still
-  work at checkout).
+- **The home-page counts read the newest 100 app discounts on the store**,
+  including other apps' discounts that are then filtered out. The codes list
+  pages through everything, but a page can show fewer than 50 codes when
+  other apps' discounts were filtered out of it.
 - **The customer-lock sync covers up to 1,000 app discounts** and runs when the
   home page opens. Codes beyond that keep Shopify's own customer eligibility
   but aren't locked to a login.

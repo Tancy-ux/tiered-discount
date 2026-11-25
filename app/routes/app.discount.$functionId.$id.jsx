@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_TIERS,
   confirmLargeDiscount,
+  formatMoney,
   readTiers,
   statusBadge,
   tiersForSubmit,
@@ -74,6 +75,11 @@ export const loader = async ({ params, request }) => {
               endsAt
               usageLimit
               appliesOncePerCustomer
+              asyncUsageCount
+              totalSales {
+                amount
+                currencyCode
+              }
               codes(first: 1) {
                 nodes {
                   code
@@ -149,6 +155,10 @@ export const loader = async ({ params, request }) => {
     startsAt: isoToShopDate(discount.startsAt, data.shop.ianaTimezone),
     endsAt: isoToShopDate(discount.endsAt, data.shop.ianaTimezone),
     usageLimit: discount.usageLimit,
+    used: discount.asyncUsageCount,
+    sales: discount.totalSales
+      ? formatMoney(discount.totalSales.amount, discount.totalSales.currencyCode)
+      : null,
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
     customer,
     defaultTiers,
@@ -466,7 +476,9 @@ export default function DiscountDetail() {
     useCustomTiers &&
     (customTiersDraft.length === 0 || hasBadTiers(customTiersDraft));
   // Same-format date strings ("YYYY-MM-DD") compare correctly as text.
-  const datesInvalid = Boolean(startsAt && endsAt && endsAt < startsAt);
+  const endBeforeStart = Boolean(startsAt && endsAt && endsAt < startsAt);
+  // A code always has a start date; clearing it can't be saved.
+  const datesInvalid = !startsAt || endBeforeStart;
   const canSave =
     Boolean(code.trim()) &&
     isDirty &&
@@ -691,6 +703,19 @@ export default function DiscountDetail() {
             </s-text>
             {customer?.email && <s-text color="subdued">{customer.email}</s-text>}
           </s-stack>
+          <s-stack direction="block" gap="small-300">
+            <s-text color="subdued">Used</s-text>
+            <s-text type="strong">
+              {loaderData.usageLimit
+                ? `${loaderData.used} of ${loaderData.usageLimit} times`
+                : `${loaderData.used} ${loaderData.used === 1 ? "time" : "times"}`}
+            </s-text>
+          </s-stack>
+          <s-stack direction="block" gap="small-300">
+            <s-text color="subdued">Sales from orders using this code</s-text>
+            <s-text type="strong">{loaderData.sales ?? "—"}</s-text>
+            <s-text color="subdued">Can take a few minutes to update.</s-text>
+          </s-stack>
         </s-stack>
       </s-section>
 
@@ -712,13 +737,14 @@ export default function DiscountDetail() {
           ></s-number-field>
           <s-date-field
             label="Start date"
+            {...(!startsAt ? { error: "Enter a start date" } : {})}
             value={startsAt}
             onChange={(event) => setStartsAt(event.currentTarget.value)}
           ></s-date-field>
           <s-date-field
             label="End date (optional)"
             details="The code works until the end of this day."
-            {...(datesInvalid
+            {...(endBeforeStart
               ? { error: "End date must be on or after the start date" }
               : {})}
             value={endsAt}
