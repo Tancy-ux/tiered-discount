@@ -35,6 +35,10 @@ no manual price rule setup per order size.
   date lasts until 23:59:59 on that day, in the time zone set in the store's
   Shopify settings. The end date can't be before the start date. Saving other
   details on a code never moves its existing dates.
+- **Combining with other discounts:** each code can be allowed to combine with
+  product discounts, other order discounts and shipping discounts (code page
+  and bulk create). New codes combine with shipping discounts only. Shopify
+  only stacks two discounts when both allow it.
 - **Suggested codes:** picking a customer on the home page suggests a code
   from the store's name and the customer's first name, e.g. "Ware
   Innovations" + "Priya Shah" → `WARE-PRIYA`.

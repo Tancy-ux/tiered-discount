@@ -5,6 +5,13 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { TierEditor, hasBadTiers } from "../components/TierEditor";
 import {
+  CombineOptions,
+  DEFAULT_COMBINES,
+  combinesFormFields,
+  combinesWithInput,
+  readCombines,
+} from "../components/CombineOptions";
+import {
   DEFAULT_TIERS,
   confirmLargeDiscount,
   readTiers,
@@ -43,6 +50,7 @@ export const action = async ({ request }) => {
 
   const formData = await request.formData();
   const raw = formData.get("codes")?.toString() ?? "";
+  const combines = readCombines(formData);
 
   const codes = [
     ...new Set(
@@ -87,11 +95,7 @@ export const action = async ({ request }) => {
             code,
             functionHandle: FUNCTION_HANDLE,
             discountClasses: ["ORDER"],
-            combinesWith: {
-              orderDiscounts: false,
-              productDiscounts: false,
-              shippingDiscounts: true,
-            },
+            combinesWith: combinesWithInput(combines),
             startsAt: new Date().toISOString(),
             ...(customTiers
               ? { metafields: codeTiersMetafields(customTiers) }
@@ -119,6 +123,7 @@ export default function BulkCreate() {
   const shopify = useAppBridge();
   const [codesText, setCodesText] = useState("");
   const [useCustomTiers, setUseCustomTiers] = useState(false);
+  const [combines, setCombines] = useState(DEFAULT_COMBINES);
   const [tiers, setTiers] = useState(defaultTiers);
 
   const isSubmitting = fetcher.state !== "idle";
@@ -152,6 +157,7 @@ export default function BulkCreate() {
       {
         codes: codesText,
         useCustomTiers: String(useCustomTiers),
+        ...combinesFormFields(combines),
         tiers: JSON.stringify(tiersForSubmit(tiers)),
       },
       { method: "post" },
@@ -210,6 +216,10 @@ export default function BulkCreate() {
               : ""}
           </s-text>
         </s-stack>
+      </s-section>
+
+      <s-section heading="Combinations">
+        <CombineOptions value={combines} onChange={setCombines} />
       </s-section>
 
       <s-section heading="Discount tiers">

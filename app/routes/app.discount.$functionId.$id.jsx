@@ -6,6 +6,13 @@ import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
 import { TierEditor, hasBadTiers } from "../components/TierEditor";
 import {
+  CombineOptions,
+  combinesFormFields,
+  combinesWithInput,
+  readCombines,
+  sameCombines,
+} from "../components/CombineOptions";
+import {
   DEFAULT_TIERS,
   confirmLargeDiscount,
   readTiers,
@@ -132,7 +139,11 @@ export const loader = async ({ params, request }) => {
     id,
     code: discount.codes.nodes[0]?.code ?? discount.title,
     status: discount.status,
-    combinesWithShipping: discount.combinesWith.shippingDiscounts,
+    combines: {
+      order: discount.combinesWith.orderDiscounts,
+      product: discount.combinesWith.productDiscounts,
+      shipping: discount.combinesWith.shippingDiscounts,
+    },
     // Dates as the merchant sees them, in the shop's time zone.
     startsAt: isoToShopDate(discount.startsAt, data.shop.ianaTimezone),
     endsAt: isoToShopDate(discount.endsAt, data.shop.ianaTimezone),
@@ -182,7 +193,7 @@ export const action = async ({ params, request }) => {
   const customerId = formData.get("customerId")?.toString().trim() ?? "";
   const previousCustomerId =
     formData.get("previousCustomerId")?.toString().trim() ?? "";
-  const combinesWithShipping = formData.get("combinesWithShipping") === "true";
+  const combines = readCombines(formData);
   // Dates are only sent when the merchant changed them, so saving other
   // details never moves a code's existing start or end time.
   const startsAt = formData.has("startsAt")
@@ -255,11 +266,7 @@ export const action = async ({ params, request }) => {
         discount: {
           title: code,
           code,
-          combinesWith: {
-            orderDiscounts: false,
-            productDiscounts: false,
-            shippingDiscounts: combinesWithShipping,
-          },
+          combinesWith: combinesWithInput(combines),
           ...dates,
           usageLimit: usageLimitRaw ? Number(usageLimitRaw) : null,
           appliesOncePerCustomer,
@@ -355,8 +362,8 @@ export default function DiscountDetail() {
     loaderData.notFound ? null : loaderData.customer,
   );
   const [code, setCode] = useState(loaderData.notFound ? "" : loaderData.code);
-  const [combinesWithShipping, setCombinesWithShipping] = useState(
-    loaderData.notFound ? true : loaderData.combinesWithShipping,
+  const [combines, setCombines] = useState(
+    loaderData.notFound ? null : loaderData.combines,
   );
   const [startsAt, setStartsAt] = useState(
     loaderData.notFound ? "" : loaderData.startsAt,
@@ -407,7 +414,7 @@ export default function DiscountDetail() {
     !loaderData.notFound &&
     ((customer?.id ?? null) !== (loaderData.customer?.id ?? null) ||
       code.trim() !== loaderData.code ||
-      combinesWithShipping !== loaderData.combinesWithShipping ||
+      !sameCombines(combines, loaderData.combines) ||
       startsAt !== loaderData.startsAt ||
       endsAt !== loaderData.endsAt ||
       String(usageLimit) !== String(loaderData.usageLimit ?? "") ||
@@ -481,7 +488,7 @@ export default function DiscountDetail() {
         code: code.trim(),
         customerId: customer?.id ?? "",
         previousCustomerId: loaderData.customer?.id ?? "",
-        combinesWithShipping: String(combinesWithShipping),
+        ...combinesFormFields(combines),
         ...(startsAt !== loaderData.startsAt ? { startsAt } : {}),
         ...(endsAt !== loaderData.endsAt ? { endsAt } : {}),
         usageLimit: String(usageLimit),
@@ -613,13 +620,7 @@ export default function DiscountDetail() {
 
       <s-section slot="aside" heading="Rules">
         <s-stack direction="block" gap="base">
-          <s-checkbox
-            label="Combine with shipping discounts"
-            {...(combinesWithShipping ? { checked: true } : {})}
-            onChange={(event) =>
-              setCombinesWithShipping(event.currentTarget.checked)
-            }
-          ></s-checkbox>
+          <CombineOptions value={combines} onChange={setCombines} />
           <s-checkbox
             label="Limit to one use per customer"
             {...(appliesOncePerCustomer ? { checked: true } : {})}
