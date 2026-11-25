@@ -12,10 +12,8 @@ import {
   readCombines,
 } from "../components/CombineOptions";
 import {
-  CombinesSection,
   DatesSection,
-  LimitsSection,
-  NotesSection,
+  MoreSettingsSection,
   TiersSection,
   datesProblems,
   usageLimitProblem,
@@ -260,19 +258,17 @@ export default function NewDiscount() {
         onEndsAtChange={setEndsAt}
       />
 
-      <LimitsSection
+      <MoreSettingsSection
         slot="aside"
         usageLimit={usageLimit}
         onUsageLimitChange={setUsageLimit}
         appliesOncePerCustomer={appliesOncePerCustomer}
         onAppliesOncePerCustomerChange={setAppliesOncePerCustomer}
-      />
-      <CombinesSection
-        slot="aside"
         combines={combines}
         onCombinesChange={setCombines}
+        notes={notes}
+        onNotesChange={setNotes}
       />
-      <NotesSection slot="aside" notes={notes} onNotesChange={setNotes} />
     </s-page>
   );
 }

@@ -73,6 +73,11 @@ no manual price rule setup per order size.
   message with the code, its tiers, its end date (if any) and a reminder to
   log in before checkout, with a Copy message button. It's built from the
   saved code, so it never describes unsaved edits.
+- **More settings:** on the create page and a code's page, total uses, one
+  use per customer, combinations and notes sit in one section that starts
+  closed and shows a one-line summary ("Unlimited uses · Combines with
+  shipping discounts · No notes"). It opens by itself if one of its fields
+  has an error.
 - **Compact layout:** the code page puts the code and customer side by side,
   start and end dates side by side, and the status badge next to the code
   name. Tier rows show column labels once, amounts carry the currency, and

@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 // Page sections shared by the create page and a code's page, so both look
 // and validate the same.
+import { useState } from "react";
 import { TierEditor, TierSummary } from "./TierEditor";
 import { CombineOptions } from "./CombineOptions";
 
@@ -102,38 +103,6 @@ export function DatesSection({ startsAt, endsAt, onStartsAtChange, onEndsAtChang
   );
 }
 
-export function LimitsSection({
-  usageLimit,
-  onUsageLimitChange,
-  appliesOncePerCustomer,
-  onAppliesOncePerCustomerChange,
-  slot,
-}) {
-  const problem = usageLimitProblem(usageLimit);
-  return (
-    <s-section heading="Usage limits" {...(slot ? { slot } : {})}>
-      <s-stack direction="block" gap="base">
-        <s-number-field
-          label="Total uses"
-          placeholder="Unlimited"
-          min={1}
-          step={1}
-          {...(problem ? { error: problem } : {})}
-          value={String(usageLimit ?? "")}
-          onInput={(event) => onUsageLimitChange(event.currentTarget.value)}
-        ></s-number-field>
-        <s-checkbox
-          label="One use per customer"
-          {...(appliesOncePerCustomer ? { checked: true } : {})}
-          onChange={(event) =>
-            onAppliesOncePerCustomerChange(event.currentTarget.checked)
-          }
-        ></s-checkbox>
-      </s-stack>
-    </s-section>
-  );
-}
-
 export function CombinesSection({ combines, onCombinesChange, slot }) {
   return (
     <s-section heading="Combines with" {...(slot ? { slot } : {})}>
@@ -142,17 +111,91 @@ export function CombinesSection({ combines, onCombinesChange, slot }) {
   );
 }
 
-export function NotesSection({ notes, onNotesChange, slot }) {
+/** One-line summary of the settings folded into More settings. */
+function moreSettingsSummary({ usageLimit, appliesOncePerCustomer, combines, notes }) {
+  const limit = String(usageLimit ?? "").trim();
+  const uses = limit ? `Up to ${limit} uses` : "Unlimited uses";
+  const perCustomer = appliesOncePerCustomer ? ", one per customer" : "";
+  const combineNames = [
+    combines.product && "product",
+    combines.order && "order",
+    combines.shipping && "shipping",
+  ].filter(Boolean);
+  const combine = combineNames.length
+    ? `Combines with ${combineNames.join(", ")} discounts`
+    : "Doesn't combine";
+  return [`${uses}${perCustomer}`, combine, notes.trim() ? "Has notes" : "No notes"].join(" · ");
+}
+
+/**
+ * Usage limits, combinations and notes in one section that starts closed,
+ * with a summary line. Opens by itself when a field has an error.
+ */
+export function MoreSettingsSection({
+  usageLimit,
+  onUsageLimitChange,
+  appliesOncePerCustomer,
+  onAppliesOncePerCustomerChange,
+  combines,
+  onCombinesChange,
+  notes,
+  onNotesChange,
+  slot,
+}) {
+  const [userOpen, setUserOpen] = useState(false);
+  const problem = usageLimitProblem(usageLimit);
+  const open = userOpen || Boolean(problem);
   return (
-    <s-section heading="Notes" {...(slot ? { slot } : {})}>
-      <s-text-area
-        label="Notes"
-        labelAccessibilityVisibility="exclusive"
-        placeholder="Only you see these"
-        rows={3}
-        value={notes}
-        onInput={(event) => onNotesChange(event.currentTarget.value)}
-      ></s-text-area>
+    <s-section heading="More settings" {...(slot ? { slot } : {})}>
+      <s-stack direction="block" gap="base">
+        <s-stack direction="block" gap="small-200">
+          <s-text color="subdued">
+            {moreSettingsSummary({ usageLimit, appliesOncePerCustomer, combines, notes })}
+          </s-text>
+          <s-stack direction="inline">
+            <s-button
+              variant="tertiary"
+              icon={open ? "chevron-up" : "chevron-down"}
+              {...(problem ? { disabled: true } : {})}
+              onClick={() => setUserOpen(!open)}
+            >
+              {open ? "Hide settings" : "Show settings"}
+            </s-button>
+          </s-stack>
+        </s-stack>
+        {open && (
+          <>
+            <s-divider></s-divider>
+            <s-number-field
+              label="Total uses"
+              placeholder="Unlimited"
+              min={1}
+              step={1}
+              {...(problem ? { error: problem } : {})}
+              value={String(usageLimit ?? "")}
+              onInput={(event) => onUsageLimitChange(event.currentTarget.value)}
+            ></s-number-field>
+            <s-checkbox
+              label="One use per customer"
+              {...(appliesOncePerCustomer ? { checked: true } : {})}
+              onChange={(event) =>
+                onAppliesOncePerCustomerChange(event.currentTarget.checked)
+              }
+            ></s-checkbox>
+            <s-divider></s-divider>
+            <s-text type="strong">Combines with</s-text>
+            <CombineOptions value={combines} onChange={onCombinesChange} />
+            <s-divider></s-divider>
+            <s-text-area
+              label="Notes"
+              placeholder="Only you see these"
+              rows={3}
+              value={notes}
+              onInput={(event) => onNotesChange(event.currentTarget.value)}
+            ></s-text-area>
+          </>
+        )}
+      </s-stack>
     </s-section>
   );
 }
