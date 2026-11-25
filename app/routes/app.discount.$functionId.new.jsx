@@ -5,7 +5,7 @@ import {
   useNavigate,
   useParams,
 } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
+import { SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
@@ -182,6 +182,34 @@ export default function NewDiscount() {
   const [notes, setNotes] = useState("");
 
   const isSaving = fetcher.state !== "idle";
+  const created = Boolean(fetcher.data?.ok);
+
+  // Anything entered that would be lost by leaving (drives the save bar).
+  const hasEntries =
+    !created &&
+    (Boolean(code.trim()) ||
+      Boolean(customer) ||
+      useCustomTiers ||
+      startsAt !== today ||
+      Boolean(endsAt) ||
+      Boolean(String(usageLimit).trim()) ||
+      appliesOncePerCustomer ||
+      combines.order !== DEFAULT_COMBINES.order ||
+      combines.product !== DEFAULT_COMBINES.product ||
+      combines.shipping !== DEFAULT_COMBINES.shipping ||
+      Boolean(notes.trim()));
+  const handleDiscard = () => {
+    setCustomer(null);
+    setCode("");
+    setUseCustomTiers(false);
+    setTiers(defaultTiers);
+    setStartsAt(today);
+    setEndsAt("");
+    setUsageLimit("");
+    setAppliesOncePerCustomer(false);
+    setCombines(DEFAULT_COMBINES);
+    setNotes("");
+  };
 
   useEffect(() => {
     if (fetcher.data?.ok) {
@@ -246,6 +274,20 @@ export default function NewDiscount() {
 
   return (
     <s-page heading="Create discount code">
+      {/* Shopify's save bar: shows while there are unsaved changes, and the
+          admin asks before leaving the page while it's open. */}
+      <SaveBar id="create-save-bar" open={hasEntries}>
+        <button
+          variant="primary"
+          {...(isSaving ? { loading: "" } : {})}
+          {...(canSave ? {} : { disabled: true })}
+          onClick={() => handleSave()}
+        >
+          Save
+        </button>
+        <button onClick={handleDiscard}>Discard</button>
+      </SaveBar>
+
       <s-link slot="breadcrumb-actions" href="/app/discounts">
         Discount codes
       </s-link>

@@ -183,7 +183,15 @@ export default function Home() {
       .sort((a, b) => a - b);
     return String(amounts.find((amount) => amount > 0) ?? amounts[0] ?? "");
   });
-  const check = tierForAmount(defaultTiers, cartAmount);
+  const cartValue = String(cartAmount ?? "").trim();
+  const cartNumber = Number(cartValue);
+  const cartError =
+    cartValue && (!Number.isFinite(cartNumber) || cartNumber < 0)
+      ? "Enter 0 or more"
+      : null;
+  // Nothing to say until a valid amount is typed.
+  const check =
+    cartValue && !cartError ? tierForAmount(defaultTiers, cartNumber) : null;
   const guideFetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -243,9 +251,9 @@ export default function Home() {
             <s-stack direction="block" gap="small-300">
               <GuideStep
                 done={steps[0]}
-                title="Set your default tiers"
-                details="Choose the cart amounts and discounts every code uses."
-                action={<s-button href="/app/settings">Settings</s-button>}
+                title="Save your default tiers"
+                details="Codes use the built-in tiers until you save your own. Open Settings, check the tiers and press Save, even if you keep them as they are."
+                action={<s-button href="/app/settings">Open Settings</s-button>}
               />
               <GuideStep
                 done={steps[1]}
@@ -305,17 +313,20 @@ export default function Home() {
               label="Check a cart amount"
               min={0}
               prefix={currencyCode}
+              {...(cartError ? { error: cartError } : {})}
               value={cartAmount}
               onInput={(event) => setCartAmount(event.currentTarget.value)}
             ></s-number-field>
-            <s-text>
-              {check.tier
-                ? `Gets ${check.tier.percentage}% off (saves ${formatMoney(check.saving, currencyCode)}).`
-                : "No discount yet."}
-              {check.next
-                ? ` ${formatMoney(check.toNext, currencyCode)} more reaches ${check.next.percentage}%.`
-                : ""}
-            </s-text>
+            {check && (
+              <s-text>
+                {check.tier
+                  ? `Gets ${check.tier.percentage}% off (saves ${formatMoney(check.saving, currencyCode)}).`
+                  : "No discount yet."}
+                {check.next
+                  ? ` ${formatMoney(check.toNext, currencyCode)} more reaches ${check.next.percentage}%.`
+                  : ""}
+              </s-text>
+            )}
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-text color="subdued">

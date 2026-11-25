@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFetcher, useLoaderData, redirect } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
+import { SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
@@ -668,6 +668,20 @@ export default function DiscountDetail() {
     setConfirmingDelete(true);
   };
 
+  // Back to the saved code (save bar's Discard).
+  const handleDiscard = () => {
+    setCustomer(loaderData.customer);
+    setCode(loaderData.code);
+    setCombines(loaderData.combines);
+    setStartsAt(loaderData.startsAt);
+    setEndsAt(loaderData.endsAt);
+    setUsageLimit(loaderData.usageLimit ?? "");
+    setAppliesOncePerCustomer(loaderData.appliesOncePerCustomer);
+    setUseCustomTiers(hasSavedCustomTiers);
+    setCustomTiersDraft(loaderData.customTiers ?? loaderData.defaultTiers);
+    setNotes(loaderData.notes);
+  };
+
   const handleCopyCode = async () => {
     if (await copyText(code)) shopify.toast.show("Code copied");
     else shopify.toast.show("Couldn't copy code", { isError: true });
@@ -711,6 +725,20 @@ export default function DiscountDetail() {
 
   return (
     <s-page heading={loaderData.code}>
+      {/* Shopify's save bar: shows while there are unsaved changes, and the
+          admin asks before leaving the page while it's open. */}
+      <SaveBar id="code-save-bar" open={isDirty}>
+        <button
+          variant="primary"
+          {...(isSaving ? { loading: "" } : {})}
+          {...(canSave ? {} : { disabled: true })}
+          onClick={() => handleSave()}
+        >
+          Save
+        </button>
+        <button onClick={handleDiscard}>Discard</button>
+      </SaveBar>
+
       <s-badge slot="accessory" tone={badge.tone} icon={badge.icon}>
         {badge.label}
       </s-badge>

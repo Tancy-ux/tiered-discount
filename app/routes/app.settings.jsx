@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
+import { SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { TierEditor, hasBadTiers } from "../components/TierEditor";
@@ -50,10 +50,12 @@ export default function Settings() {
   }, [fetcher.data, shopify]);
 
   const isSaving = fetcher.state !== "idle";
-  const isDirty =
-    !hasSavedTiers ||
+  // Real edits only (drives the save bar). Stores still on the built-in
+  // tiers can also press Save as-is to keep them.
+  const hasEdits =
     JSON.stringify(tiersForSubmit(tiers)) !==
-      JSON.stringify(tiersForSubmit(defaultTiers));
+    JSON.stringify(tiersForSubmit(defaultTiers));
+  const isDirty = !hasSavedTiers || hasEdits;
   const canSave =
     isDirty && !isSaving && tiers.length > 0 && !hasBadTiers(tiers);
 
@@ -75,6 +77,20 @@ export default function Settings() {
 
   return (
     <s-page heading="Settings">
+      {/* Shopify's save bar: shows while there are unsaved changes, and the
+          admin asks before leaving the page while it's open. */}
+      <SaveBar id="settings-save-bar" open={hasEdits}>
+        <button
+          variant="primary"
+          {...(isSaving ? { loading: "" } : {})}
+          {...(canSave ? {} : { disabled: true })}
+          onClick={() => handleSave()}
+        >
+          Save
+        </button>
+        <button onClick={() => setTiers(JSON.parse(savedKey))}>Discard</button>
+      </SaveBar>
+
       <s-button
         slot="primary-action"
         variant="primary"

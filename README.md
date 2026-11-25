@@ -27,7 +27,20 @@ no manual price rule setup per order size.
   confirmation first, to catch typos like 50 instead of 5. Deleting a code
   asks too. Both use Shopify's modal component, not the browser's confirm().
 - **Tier checks:** a discount must be 0–100%, and no two tiers can use the
-  same cart subtotal (the field shows an error and saving is blocked).
+  same cart subtotal (the field shows an error and saving is blocked; the
+  duplicate error goes on the row being edited). A tier that gives a bigger
+  cart a smaller discount than a smaller cart gets shows a warning but can
+  still be saved. Column headings sit in their own row, so fields stay lined
+  up when an error appears.
+- **Code names:** trimmed and saved in capitals; only letters, numbers, `-`
+  and `_`. A code already used by any discount in the store (this app,
+  another app or Shopify admin, ignoring case) is flagged while typing
+  (`/app/code-check`, using Shopify's `codeDiscountNodeByCode`) and refused
+  on save. Applies to Create code, Bulk create and renaming a code.
+- **Unsaved changes:** the code page, the create page and Settings use
+  Shopify's save bar, which appears as soon as something changes and offers
+  Save and Discard. While it's showing, the admin asks before leaving the
+  page. On Settings it only counts real edits.
 - **Currency:** tier amounts are in the store's currency, shown next to each
   amount field. A buyer checking out in another currency is converted back
   with Shopify's `presentmentCurrencyRate` before a tier is picked, so a
@@ -46,7 +59,7 @@ no manual price rule setup per order size.
   button is disabled while the page has unsaved changes. Status shows as
   Active, Scheduled, or Paused or ended.
 - **Codes list:** search by code, filter by status (Active, Scheduled,
-  Paused or ended), and page through all codes 50 at a time with
+  Paused or ended), and page through all codes 25 at a time with
   Previous/Next. Each row shows how many times the code was used (and the
   limit, if set). Each code has a copy button.
 - **Results on each code:** a code's page shows how many times it was used
@@ -54,15 +67,19 @@ no manual price rule setup per order size.
   Sales and who used a code aren't shown: Shopify leaves `totalSales` empty
   for app-made discounts, and reading the orders themselves would need the
   `read_orders` permission, which the app doesn't ask for.
+- **Loading:** Shopify's loading bar shows at the top of the admin while the
+  app moves between pages.
 - **Copy buttons** (code, codes list, customer message) work inside the
   Shopify admin frame, where the browser's clipboard API is often blocked:
   they copy through a hidden text box first (`app/clipboard.js`).
 - **Suggested codes:** picking a customer on the Create code page suggests a code
   from the store's name and the customer's first name, e.g. "Ware
   Innovations" + "Priya Shah" → `WARE-PRIYA`.
-- **Bulk create** works the same way: tick "Use custom tiers for these codes"
-  and every code in that batch is created with those tiers. Left unticked,
-  the codes use the default tiers.
+- **Bulk create:** one code per line. Blank lines are skipped, repeats are
+  counted once (ignoring case), and invalid lines and codes already in the
+  store are listed with the reason and left out, so "X codes ready" is exact
+  (up to 100 per batch). The batch shares custom or default tiers, start/end
+  dates, total uses, one use per customer, combinations and notes.
 - **Create code page** (`/app/discount/:functionId/new`, also opened by
   Shopify's Discounts > Create discount): everything is set in one step:
   customer (optional; leave empty for anyone with the code), code, custom or
@@ -70,8 +87,10 @@ no manual price rule setup per order size.
   combinations and notes. Total uses must be a whole number of 1 or more, or
   empty for unlimited.
 - **Home page:** Create code and Bulk create buttons, then:
-  - a **Get started** guide (set your default tiers → create your first code
-    → test it at checkout, with a progress bar). Steps tick themselves off
+  - a **Get started** guide (save your default tiers → create your first
+    code → test it at checkout, with a progress bar). The first step is done
+    once tiers are saved in Settings; it says to press Save even when keeping
+    the built-in tiers. Steps tick themselves off
     from the store's data; "Test it at checkout" is marked by the merchant.
     **Hide guide** removes it for good. Progress is stored in the shop
     metafield `tiered_discount.onboarding`.
@@ -79,7 +98,8 @@ no manual price rule setup per order size.
     over the newest 100 app codes ("+" when there are more).
   - **Your default tiers** as a short list, with **Check a cart amount**: type
     an amount to see which tier it reaches, what it saves and how much more
-    reaches the next tier.
+    reaches the next tier. Empty shows nothing; a negative amount shows an
+    error.
   - **Recent codes:** the newest four, with who they're for and their status.
 - **Code page layout:** one field per line (code, then customer; start date,
   then end date) with the status badge next to the code name. A chosen

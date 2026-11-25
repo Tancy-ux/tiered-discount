@@ -6,7 +6,8 @@ import { authenticate } from "../shopify.server";
 import { statusBadge } from "../tiers";
 import { copyText } from "../clipboard";
 
-const PAGE_SIZE = 50;
+// Smaller pages load faster; Previous/Next pages through the rest.
+const PAGE_SIZE = 25;
 const STATUSES = ["active", "scheduled", "expired"];
 
 function legacyId(gid) {
