@@ -51,15 +51,36 @@ no manual price rule setup per order size.
 - **Results on each code:** a code's page shows times used and sales from
   orders using the code (Shopify's `asyncUsageCount` and `totalSales`). Both
   can take a few minutes to update after an order.
-- **Suggested codes:** picking a customer on the home page suggests a code
+- **Suggested codes:** picking a customer on the Create code page suggests a code
   from the store's name and the customer's first name, e.g. "Ware
   Innovations" + "Priya Shah" → `WARE-PRIYA`.
 - **Bulk create** works the same way: tick "Use custom tiers for these codes"
   and every code in that batch is created with those tiers. Left unticked,
   the codes use the default tiers.
-- Merchants create discount codes through the app's admin UI: pick a customer
-  to restrict the code to them, or leave it blank so anyone with the code can
-  use it. Each code supports its own start/end dates, usage limits, and notes.
+- **Create code page** (`/app/discount/:functionId/new`, also opened by
+  Shopify's Discounts > Create discount): everything is set in one step:
+  customer (optional; leave empty for anyone with the code), code, custom or
+  default tiers, start/end dates, total uses, one use per customer,
+  combinations and notes. Total uses must be a whole number of 1 or more, or
+  empty for unlimited.
+- **Home page:** Create code and Bulk create buttons, a **Get started** guide
+  (set your default tiers → create your first code → test it at checkout,
+  with a progress bar), the default tiers as a short list, and active/all code
+  counts. Steps tick themselves off from the store's data; "Test it at
+  checkout" is marked by the merchant. **Hide guide** removes it for good.
+  Progress is stored in the shop metafield `tiered_discount.onboarding`.
+- **Send to customer:** a customer-specific code's page shows a ready-to-send
+  message with the code, its tiers, its end date (if any) and a reminder to
+  log in before checkout, with a Copy message button. It's built from the
+  saved code, so it never describes unsaved edits.
+- **Compact layout:** the code page puts the code and customer side by side,
+  start and end dates side by side, and the status badge next to the code
+  name. Tier rows show column labels once, amounts carry the currency, and
+  read-only tiers show as a short list ("₹50,000 and up → 7.5% off").
+  Colour is kept to meaning: status badges are green (Active), yellow
+  (Scheduled) or grey (Paused or ended) with an icon, tier discounts show as
+  green pills, and the Custom tiers badge uses Shopify's accent purple. Notes
+  that used light-blue info banners are plain grey boxes.
 - **Customer-specific codes only work for that customer, signed in.** The app
   stores the allowed customer IDs on the discount (`tiered_discount.customer_id`)
   and the Function gives no discount unless one of them is logged in to their
@@ -91,6 +112,7 @@ with a discount above 100% is ignored, so a bad value never breaks checkout.
 | Discount | `tiers`       | json                     | This code's own tiers, same shape. Missing = defaults |
 | Discount | `customer_id` | single_line_text_field   | Allowed customer GIDs, comma-separated. Missing = anyone |
 | Discount | `notes`       | multi_line_text_field    | Merchant notes                                    |
+| Shop     | `onboarding`  | json                     | Setup guide: `{"tested":bool,"dismissed":bool}`   |
 
 ## Privacy and customer data
 
@@ -144,10 +166,10 @@ with a discount above 100% is ignored, so a bad value never breaks checkout.
 - **The customer-lock sync covers up to 1,000 app discounts** and runs when the
   home page opens. Codes beyond that keep Shopify's own customer eligibility
   but aren't locked to a login.
-- **A blank tier field is saved as 0.** Tiers are sorted by cart subtotal when
-  saved.
+- **Every tier field must be filled in;** a blank amount or discount blocks
+  saving. Tiers are sorted by cart subtotal when saved.
 - **Bulk create makes codes for anyone.** To restrict a code to a customer,
-  create it from the home page.
+  use Create code.
 
 ## Updating a live app
 

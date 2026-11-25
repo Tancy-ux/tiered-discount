@@ -3,14 +3,14 @@ import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
-import { TierEditor, hasBadTiers } from "../components/TierEditor";
+import { TierEditor, TierSummary, hasBadTiers } from "../components/TierEditor";
 import {
-  CombineOptions,
   DEFAULT_COMBINES,
   combinesFormFields,
   combinesWithInput,
   readCombines,
 } from "../components/CombineOptions";
+import { CombinesSection } from "../components/DiscountSections";
 import {
   DEFAULT_TIERS,
   confirmLargeDiscount,
@@ -171,13 +171,10 @@ export default function BulkCreate() {
       </s-link>
 
       <s-section heading="Create multiple codes">
-        <s-banner tone="info" heading="Usable by anyone">
-          <s-paragraph>
-            Every code created here is unrestricted — anyone with the code
-            can use it. To restrict a code to a specific customer, create it
-            individually from the home page instead.
-          </s-paragraph>
-        </s-banner>
+        <s-paragraph>
+          Codes made here can be used by anyone who has them. To make a code
+          for one customer, use Create code instead.
+        </s-paragraph>
 
         {fetcher.data?.ok === false && (
           <s-banner tone="critical" heading="Couldn't create codes">
@@ -218,9 +215,7 @@ export default function BulkCreate() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Combinations">
-        <CombineOptions value={combines} onChange={setCombines} />
-      </s-section>
+      <CombinesSection combines={combines} onCombinesChange={setCombines} />
 
       <s-section heading="Discount tiers">
         <s-stack direction="block" gap="base">
@@ -244,13 +239,13 @@ export default function BulkCreate() {
             </>
           ) : (
             <>
-              <s-text color="subdued">Default tiers:</s-text>
-              <TierEditor
-                tiers={defaultTiers}
-                onChange={() => {}}
-                disabled
-                currencyCode={currencyCode}
-              />
+              <s-box padding="small-200 base" background="subdued" borderRadius="base">
+                <TierSummary tiers={defaultTiers} currencyCode={currencyCode} />
+              </s-box>
+              <s-stack direction="inline" gap="small-200" alignItems="center">
+                <s-text color="subdued">Uses your default tiers.</s-text>
+                <s-link href="/app/settings">Change default tiers</s-link>
+              </s-stack>
             </>
           )}
         </s-stack>

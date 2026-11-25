@@ -4,17 +4,26 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
-import { TierEditor, hasBadTiers } from "../components/TierEditor";
+import { hasBadTiers } from "../components/TierEditor";
 import {
-  CombineOptions,
   combinesFormFields,
   combinesWithInput,
   readCombines,
   sameCombines,
 } from "../components/CombineOptions";
 import {
+  CombinesSection,
+  DatesSection,
+  LimitsSection,
+  NotesSection,
+  TiersSection,
+  datesProblems,
+  usageLimitProblem,
+} from "../components/DiscountSections";
+import {
   DEFAULT_TIERS,
   confirmLargeDiscount,
+  describeTiers,
   formatMoney,
   readTiers,
   statusBadge,
@@ -27,6 +36,41 @@ import {
   setCustomerLock,
 } from "../discount-metafields.server";
 import { isoToShopDate, shopDateToIso } from "../dates";
+
+// Two columns on wide screens, one on narrow ones.
+const TWO_COLUMNS = "@container (inline-size > 520px) 1fr 1fr, 1fr";
+
+/** "2026-12-31" → "31 Dec 2026" */
+function readableDate(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+/**
+ * Ready-to-send message for a customer-specific code, from the SAVED code
+ * (so it never describes unsaved edits). null for codes open to anyone.
+ * @returns {string[] | null} paragraphs
+ */
+function buildCustomerMessage(saved) {
+  if (!saved.customer) return null;
+  const firstName = (saved.customer.displayName ?? "").trim().split(/\s+/)[0];
+  const tiers = saved.customTiers ?? saved.defaultTiers;
+  const where = saved.storeUrl
+    ? `at ${saved.storeUrl.replace(/^https?:\/\//, "")}`
+    : "on our store";
+  return [
+    `Hi${firstName ? ` ${firstName}` : ""}, here's your personal discount code: ${saved.code}`,
+    `Your discount: ${describeTiers(tiers, saved.currencyCode)}.${
+      saved.endsAt ? ` Valid until ${readableDate(saved.endsAt)}.` : ""
+    }`,
+    `Log in to your account ${where} before you check out. The code only works when you're logged in.`,
+  ];
+}
 
 async function loadShopTimeZone(admin) {
   const response = await admin.graphql(
@@ -108,6 +152,9 @@ export const loader = async ({ params, request }) => {
           id
           ianaTimezone
           currencyCode
+          primaryDomain {
+            url
+          }
           metafield(namespace: "tiered_discount", key: "config") {
             id
             value
@@ -163,6 +210,7 @@ export const loader = async ({ params, request }) => {
     customer,
     defaultTiers,
     currencyCode: data.shop.currencyCode,
+    storeUrl: data.shop.primaryDomain?.url ?? "",
     customTiers,
     notes: data.discountNode.notesMetafield?.value ?? "",
   };
@@ -263,6 +311,11 @@ export const action = async ({ params, request }) => {
       intent: "updateDiscount",
       error: "Enter a code.",
     };
+  }
+
+  const limitProblem = usageLimitProblem(usageLimitRaw);
+  if (limitProblem) {
+    return { ok: false, intent: "updateDiscount", error: `Total uses: ${limitProblem}.` };
   }
 
   // Check the tiers before changing anything, so a bad tier never leaves
@@ -475,16 +528,15 @@ export default function DiscountDetail() {
   const tiersInvalid =
     useCustomTiers &&
     (customTiersDraft.length === 0 || hasBadTiers(customTiersDraft));
-  // Same-format date strings ("YYYY-MM-DD") compare correctly as text.
-  const endBeforeStart = Boolean(startsAt && endsAt && endsAt < startsAt);
-  // A code always has a start date; clearing it can't be saved.
-  const datesInvalid = !startsAt || endBeforeStart;
+  const dateProblems = datesProblems(startsAt, endsAt);
   const canSave =
     Boolean(code.trim()) &&
     isDirty &&
     !isSaving &&
     !tiersInvalid &&
-    !datesInvalid;
+    !dateProblems.start &&
+    !dateProblems.end &&
+    !usageLimitProblem(usageLimit);
 
   useEffect(() => {
     if (detailFetcher.data?.ok) {
@@ -575,10 +627,24 @@ export default function DiscountDetail() {
     );
   };
 
+  const badge = statusBadge(loaderData.status);
+  const customerMessage = buildCustomerMessage(loaderData);
+  const handleCopyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(customerMessage.join("\n\n"));
+      shopify.toast.show("Message copied");
+    } catch {
+      shopify.toast.show("Couldn't copy message", { isError: true });
+    }
+  };
+
   return (
     <s-page heading={loaderData.code}>
+      <s-badge slot="accessory" tone={badge.tone} icon={badge.icon}>
+        {badge.label}
+      </s-badge>
       <s-link slot="breadcrumb-actions" href="/app/discounts">
-        Back to discount codes
+        Discount codes
       </s-link>
 
       <s-button
@@ -622,11 +688,10 @@ export default function DiscountDetail() {
         </s-banner>
       )}
 
-      <s-section heading="Discount details">
-        <s-stack direction="block" gap="base">
-          <CustomerPicker value={customer} onChange={setCustomer} />
+      <s-section heading="Code">
+        <s-grid gridTemplateColumns={TWO_COLUMNS} gap="base">
           <s-text-field
-            label="Code"
+            label="Discount code"
             value={code}
             onInput={(event) =>
               setCode(event.currentTarget.value.toUpperCase())
@@ -635,134 +700,110 @@ export default function DiscountDetail() {
             <s-button
               slot="accessory"
               variant="tertiary"
+              icon="clipboard"
               onClick={handleCopyCode}
               accessibilityLabel="Copy code"
-            >
-              📋
-            </s-button>
+            ></s-button>
           </s-text-field>
-        </s-stack>
+          <CustomerPicker value={customer} onChange={setCustomer} />
+        </s-grid>
       </s-section>
 
-      <s-section heading="Discount tiers">
-        <s-stack direction="block" gap="base">
-          <s-checkbox
-            label="Use custom tiers for this code"
-            details="Only this code changes. Other codes keep the default tiers."
-            {...(useCustomTiers ? { checked: true } : {})}
-            onChange={(event) => setUseCustomTiers(event.currentTarget.checked)}
-          ></s-checkbox>
+      <TiersSection
+        useCustomTiers={useCustomTiers}
+        onUseCustomTiersChange={setUseCustomTiers}
+        tiers={customTiersDraft}
+        onTiersChange={setCustomTiersDraft}
+        defaultTiers={loaderData.defaultTiers}
+        currencyCode={loaderData.currencyCode}
+        customNote={`These tiers apply to ${loaderData.code} only. Changing the default tiers won't affect it.`}
+        defaultNote={
+          hasSavedCustomTiers
+            ? "Save changes to remove this code's custom tiers and use your default tiers."
+            : "Uses your default tiers."
+        }
+      />
 
-          {useCustomTiers ? (
-            <>
-              <s-text color="subdued">
-                {`These tiers apply only to ${loaderData.code}. Changing the default tiers won't affect it.`}
-              </s-text>
-              <TierEditor
-                tiers={customTiersDraft}
-                onChange={setCustomTiersDraft}
-                currencyCode={loaderData.currencyCode}
-              />
-              {customTiersDraft.length === 0 && (
-                <s-text color="subdued">Add at least one tier.</s-text>
-              )}
-            </>
-          ) : (
-            <>
-              <s-text color="subdued">
-                {hasSavedCustomTiers
-                  ? "Save changes to remove this code's custom tiers. It will then use the default tiers:"
-                  : "This code uses the default tiers, shared by every code without custom tiers:"}
-              </s-text>
-              <TierEditor
-                tiers={loaderData.defaultTiers}
-                onChange={() => {}}
-                disabled
-                currencyCode={loaderData.currencyCode}
-              />
-              <s-link href="/app/settings">
-                Change default tiers in Settings
-              </s-link>
-            </>
-          )}
-        </s-stack>
-      </s-section>
+      <DatesSection
+        startsAt={startsAt}
+        endsAt={endsAt}
+        onStartsAtChange={setStartsAt}
+        onEndsAtChange={setEndsAt}
+      />
 
       <s-section slot="aside" heading="Summary">
         <s-stack direction="block" gap="base">
-          <s-stack direction="block" gap="small-300">
-            <s-text color="subdued">Status</s-text>
-            <s-badge tone={statusBadge(loaderData.status).tone}>
-              {statusBadge(loaderData.status).label}
-            </s-badge>
-          </s-stack>
-          <s-stack direction="block" gap="small-300">
-            <s-text color="subdued">Made for</s-text>
+          <s-stack direction="block" gap="none">
             <s-text type="strong">
-              {customer?.displayName ?? "Anyone with the code"}
+              {loaderData.customer
+                ? `${loaderData.customer.displayName} only`
+                : "Anyone with the code"}
             </s-text>
-            {customer?.email && <s-text color="subdued">{customer.email}</s-text>}
+            {loaderData.customer && (
+              <s-text color="subdued">
+                {loaderData.customer.email
+                  ? `${loaderData.customer.email} · must be logged in`
+                  : "Must be logged in to use it"}
+              </s-text>
+            )}
           </s-stack>
-          <s-stack direction="block" gap="small-300">
-            <s-text color="subdued">Used</s-text>
-            <s-text type="strong">
-              {loaderData.usageLimit
-                ? `${loaderData.used} of ${loaderData.usageLimit} times`
-                : `${loaderData.used} ${loaderData.used === 1 ? "time" : "times"}`}
-            </s-text>
-          </s-stack>
-          <s-stack direction="block" gap="small-300">
-            <s-text color="subdued">Sales from orders using this code</s-text>
-            <s-text type="strong">{loaderData.sales ?? "—"}</s-text>
-            <s-text color="subdued">Can take a few minutes to update.</s-text>
-          </s-stack>
+          <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
+            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
+              <s-stack direction="block" gap="none">
+                <s-text color="subdued">Used</s-text>
+                <s-text type="strong">
+                  {loaderData.usageLimit
+                    ? `${loaderData.used} of ${loaderData.usageLimit}`
+                    : `${loaderData.used} ${loaderData.used === 1 ? "time" : "times"}`}
+                </s-text>
+              </s-stack>
+            </s-box>
+            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
+              <s-stack direction="block" gap="none">
+                <s-text color="subdued">Sales</s-text>
+                <s-text type="strong">{loaderData.sales ?? "—"}</s-text>
+              </s-stack>
+            </s-box>
+          </s-grid>
+          <s-text color="subdued">Usage and sales can take a few minutes to update.</s-text>
         </s-stack>
       </s-section>
 
-      <s-section slot="aside" heading="Rules">
-        <s-stack direction="block" gap="base">
-          <CombineOptions value={combines} onChange={setCombines} />
-          <s-checkbox
-            label="Limit to one use per customer"
-            {...(appliesOncePerCustomer ? { checked: true } : {})}
-            onChange={(event) =>
-              setAppliesOncePerCustomer(event.currentTarget.checked)
-            }
-          ></s-checkbox>
-          <s-number-field
-            label="Total usage limit"
-            placeholder="Unlimited"
-            value={usageLimit}
-            onInput={(event) => setUsageLimit(event.currentTarget.value)}
-          ></s-number-field>
-          <s-date-field
-            label="Start date"
-            {...(!startsAt ? { error: "Enter a start date" } : {})}
-            value={startsAt}
-            onChange={(event) => setStartsAt(event.currentTarget.value)}
-          ></s-date-field>
-          <s-date-field
-            label="End date (optional)"
-            details="The code works until the end of this day."
-            {...(endBeforeStart
-              ? { error: "End date must be on or after the start date" }
-              : {})}
-            value={endsAt}
-            onChange={(event) => setEndsAt(event.currentTarget.value)}
-          ></s-date-field>
-        </s-stack>
-      </s-section>
+      {customerMessage && (
+        <s-section slot="aside" heading="Send to customer">
+          <s-stack direction="block" gap="base">
+            <s-box padding="small-200 base" background="subdued" borderRadius="base">
+              <s-stack direction="block" gap="small-200">
+                {customerMessage.map((line) => (
+                  <s-text key={line}>{line}</s-text>
+                ))}
+              </s-stack>
+            </s-box>
+            {isDirty && (
+              <s-text color="subdued">Save your changes to update this message.</s-text>
+            )}
+            <s-stack direction="inline">
+              <s-button icon="clipboard" onClick={handleCopyMessage}>
+                Copy message
+              </s-button>
+            </s-stack>
+          </s-stack>
+        </s-section>
+      )}
 
-      <s-section slot="aside" heading="Notes">
-        <s-text-area
-          label="Notes"
-          labelAccessibilityVisibility="exclusive"
-          placeholder="Anything worth remembering about this code…"
-          rows={4}
-          value={notes}
-          onInput={(event) => setNotes(event.currentTarget.value)}
-        ></s-text-area>
-      </s-section>
+      <LimitsSection
+        slot="aside"
+        usageLimit={usageLimit}
+        onUsageLimitChange={setUsageLimit}
+        appliesOncePerCustomer={appliesOncePerCustomer}
+        onAppliesOncePerCustomerChange={setAppliesOncePerCustomer}
+      />
+      <CombinesSection
+        slot="aside"
+        combines={combines}
+        onCombinesChange={setCombines}
+      />
+      <NotesSection slot="aside" notes={notes} onNotesChange={setNotes} />
     </s-page>
   );
 }

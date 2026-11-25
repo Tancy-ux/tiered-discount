@@ -1,24 +1,11 @@
-import { useEffect, useState } from "react";
-import { useFetcher, useLoaderData, useNavigate } from "react-router";
+import { useEffect } from "react";
+import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
-import { CustomerPicker } from "../components/CustomerPicker";
-import {
-  customerLockMetafields,
-  syncCustomerLocks,
-} from "../discount-metafields.server";
-import { loadShop } from "../shop.server";
-import { describeTiers } from "../tiers";
-
-const FUNCTION_HANDLE = "tiered-order-discount";
-
-// "Ware Innovations" + "Priya Shah" → "WARE-PRIYA"
-function suggestCode(codePrefix, displayName) {
-  const firstName = (displayName ?? "").trim().split(/\s+/)[0] ?? "";
-  const cleaned = firstName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return cleaned ? `${codePrefix}${cleaned}` : "";
-}
+import { TierSummary } from "../components/TierEditor";
+import { syncCustomerLocks } from "../discount-metafields.server";
+import { loadShop, saveOnboarding } from "../shop.server";
 
 function legacyId(gid) {
   return gid.split("/").pop();
@@ -43,6 +30,9 @@ export const loader = async ({ request }) => {
           }
         }
         discountNodes(first: 100, query: "method:code type:app") {
+          pageInfo {
+            hasNextPage
+          }
           nodes {
             discount {
               __typename
@@ -74,184 +64,196 @@ export const loader = async ({ request }) => {
       node.discount.__typename === "DiscountCodeApp" &&
       node.discount.appDiscountType?.app?.id === appId,
   );
+  // Counts read the newest 100 app discounts; show "100+" style when there are more.
+  const more = data.discountNodes.pageInfo.hasNextPage ? "+" : "";
 
   const tieredFunction =
     data.shopifyFunctions.nodes.find(
       (node) => node.title === "Tiered order discount",
     ) ?? data.shopifyFunctions.nodes[0];
 
-  const { defaultTiers, currencyCode, codePrefix } = await loadShop(admin);
+  const shop = await loadShop(admin);
 
   return {
-    tiersSummary: describeTiers(defaultTiers, currencyCode),
-    codePrefix,
+    defaultTiers: shop.defaultTiers,
+    currencyCode: shop.currencyCode,
+    hasSavedTiers: shop.hasSavedTiers,
+    onboarding: shop.onboarding,
     totalCodes: codes.length,
-    activeCodes: codes.filter((node) => node.discount.status === "ACTIVE")
-      .length,
+    totalLabel: `${codes.length}${more}`,
+    activeLabel: `${codes.filter((node) => node.discount.status === "ACTIVE").length}${more}`,
     functionId: tieredFunction ? legacyId(tieredFunction.id) : null,
   };
 };
 
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
-
   const formData = await request.formData();
-  const code = formData.get("code")?.toString().trim() ?? "";
-  const customerId = formData.get("customerId")?.toString().trim() ?? "";
-
-  if (!code) {
-    return { ok: false, error: "Enter a code." };
+  const intent = formData.get("intent");
+  if (intent !== "markTested" && intent !== "hideGuide") {
+    return { ok: false, error: "Unknown action." };
   }
 
-  const response = await admin.graphql(
-    `#graphql
-      mutation CreateCustomerCode($discount: DiscountCodeAppInput!) {
-        discountCodeAppCreate(codeAppDiscount: $discount) {
-          codeAppDiscount {
-            discountId
-            title
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }`,
-    {
-      variables: {
-        discount: {
-          title: code,
-          code,
-          functionHandle: FUNCTION_HANDLE,
-          discountClasses: ["ORDER"],
-          combinesWith: {
-            orderDiscounts: false,
-            productDiscounts: false,
-            shippingDiscounts: true,
-          },
-          startsAt: new Date().toISOString(),
-          ...(customerId
-            ? {
-                context: { customers: { add: [customerId] } },
-                metafields: customerLockMetafields(customerId),
-              }
-            : {}),
-        },
-      },
-    },
-  );
-  const { data } = await response.json();
-  const userErrors = data?.discountCodeAppCreate?.userErrors ?? [];
-
-  if (userErrors.length > 0) {
-    return { ok: false, error: userErrors.map((e) => e.message).join(" ") };
-  }
-
-  return {
-    ok: true,
-    id: legacyId(data.discountCodeAppCreate.codeAppDiscount.discountId),
-    title: data.discountCodeAppCreate.codeAppDiscount.title,
-  };
+  const shop = await loadShop(admin);
+  const errors = await saveOnboarding(admin, shop.shopId, {
+    ...shop.onboarding,
+    ...(intent === "markTested" ? { tested: true } : { dismissed: true }),
+  });
+  return errors.length > 0
+    ? { ok: false, error: errors.join(" ") }
+    : { ok: true, intent };
 };
 
+// eslint-disable-next-line react/prop-types
+function GuideStep({ done, title, details, action }) {
+  return (
+    <s-box padding="small-200 base" {...(done ? {} : { background: "subdued" })} borderRadius="base">
+      <s-grid gridTemplateColumns="auto 1fr auto" gap="base" alignItems="center">
+        <s-icon
+          type={done ? "check-circle-filled" : "circle-dashed"}
+          {...(done ? { tone: "success" } : {})}
+        ></s-icon>
+        <s-stack direction="block" gap="none">
+          <s-text type="strong" {...(done ? { color: "subdued" } : {})}>
+            {title}
+          </s-text>
+          {!done && details && <s-text color="subdued">{details}</s-text>}
+        </s-stack>
+        <s-box>{!done && action}</s-box>
+      </s-grid>
+    </s-box>
+  );
+}
+
 export default function Home() {
-  const { tiersSummary, codePrefix, totalCodes, activeCodes, functionId } =
-    useLoaderData();
-  const createFetcher = useFetcher();
+  const {
+    defaultTiers,
+    currencyCode,
+    hasSavedTiers,
+    onboarding,
+    totalCodes,
+    totalLabel,
+    activeLabel,
+    functionId,
+  } = useLoaderData();
+  const guideFetcher = useFetcher();
   const shopify = useAppBridge();
-  const navigate = useNavigate();
-
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [code, setCode] = useState("");
-
-  const isSaving = createFetcher.state !== "idle";
 
   useEffect(() => {
-    if (createFetcher.data?.ok) {
-      shopify.toast.show("Discount code created");
-      if (functionId && createFetcher.data.id) {
-        navigate(`/app/discount/${functionId}/${createFetcher.data.id}`);
-      } else {
-        setCode("");
-        setSelectedCustomer(null);
-      }
+    if (guideFetcher.data?.ok === false) {
+      shopify.toast.show(guideFetcher.data.error, { isError: true });
     }
-  }, [createFetcher.data, shopify, functionId, navigate]);
+  }, [guideFetcher.data, shopify]);
 
-  const handleSelectCustomer = (customer) => {
-    setSelectedCustomer(customer);
-    if (customer && !code.trim()) {
-      setCode(suggestCode(codePrefix, customer.displayName));
-    }
-  };
-
-  const handleSave = () => {
-    if (!code.trim() || isSaving) return;
-    createFetcher.submit(
-      { code: code.trim(), customerId: selectedCustomer?.id ?? "" },
-      { method: "post" },
-    );
-  };
+  const createHref = functionId ? `/app/discount/${functionId}/new` : null;
+  const steps = [hasSavedTiers, totalCodes > 0, onboarding.tested];
+  const doneCount = steps.filter(Boolean).length;
+  const showGuide = !onboarding.dismissed && doneCount < steps.length;
+  const isSavingGuide = guideFetcher.state !== "idle";
+  const submitGuide = (intent) =>
+    guideFetcher.submit({ intent }, { method: "post" });
 
   return (
     <s-page heading="Tiered order discount">
-      <s-banner tone="info" heading="Tiered Order Discounts">
-        <s-paragraph>
-          {`Codes you create here get your default tiers at checkout: ${tiersSummary}. You can give any code its own tiers from its page. Pick a customer to restrict a code to them, or leave it blank to let anyone use it.`}
-        </s-paragraph>
-        <s-link href="/app/settings">Change default tiers</s-link>
-      </s-banner>
+      {createHref && (
+        <s-button slot="primary-action" variant="primary" href={createHref}>
+          Create code
+        </s-button>
+      )}
+      <s-button slot="secondary-actions" href="/app/bulk-create">
+        Bulk create
+      </s-button>
 
-      <s-section heading="Create a discount code">
-        {createFetcher.data?.ok === false && (
-          <s-banner tone="critical" heading="Couldn't create the code">
-            <s-paragraph>{createFetcher.data.error}</s-paragraph>
-          </s-banner>
-        )}
+      {showGuide && (
+        <s-section>
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+              <s-stack direction="block" gap="none">
+                <s-heading>Get started</s-heading>
+                <s-text color="subdued">{`${doneCount} of ${steps.length} steps done`}</s-text>
+              </s-stack>
+              <s-button
+                variant="tertiary"
+                {...(isSavingGuide ? { disabled: true } : {})}
+                onClick={() => submitGuide("hideGuide")}
+              >
+                Hide guide
+              </s-button>
+            </s-stack>
+            <s-box background="subdued" borderRadius="base" blockSize="6px">
+              <s-box
+                background="strong"
+                borderRadius="base"
+                blockSize="6px"
+                inlineSize={`${Math.round((doneCount / steps.length) * 100)}%`}
+              ></s-box>
+            </s-box>
+            <s-stack direction="block" gap="small-300">
+              <GuideStep
+                done={steps[0]}
+                title="Set your default tiers"
+                details="Choose the cart amounts and discounts every code uses."
+                action={<s-button href="/app/settings">Settings</s-button>}
+              />
+              <GuideStep
+                done={steps[1]}
+                title="Create your first code"
+                details="Pick a customer to make it theirs only, or leave it open to anyone with the code."
+                action={
+                  createHref && (
+                    <s-button variant="primary" href={createHref}>
+                      Create code
+                    </s-button>
+                  )
+                }
+              />
+              <GuideStep
+                done={steps[2]}
+                title="Test it at checkout"
+                details="Log in to your store as that customer, add items, and enter the code."
+                action={
+                  <s-button
+                    {...(isSavingGuide ? { disabled: true, loading: true } : {})}
+                    onClick={() => submitGuide("markTested")}
+                  >
+                    Mark as done
+                  </s-button>
+                }
+              />
+            </s-stack>
+          </s-stack>
+        </s-section>
+      )}
 
+      <s-section heading="Your default tiers">
         <s-stack direction="block" gap="base">
-          <CustomerPicker
-            value={selectedCustomer}
-            onChange={handleSelectCustomer}
-          />
-          <s-text color="subdued">
-            Optional - leave blank and anyone with the code can use it.
-          </s-text>
-
-          <s-text-field
-            label="Discount code"
-            value={code}
-            onInput={(event) =>
-              setCode(event.currentTarget.value.toUpperCase())
-            }
-          ></s-text-field>
-
-          <s-button
-            variant="primary"
-            {...(!code.trim() || isSaving ? { disabled: true } : {})}
-            {...(isSaving ? { loading: true } : {})}
-            onClick={handleSave}
-          >
-            Save
-          </s-button>
+          <TierSummary tiers={defaultTiers} currencyCode={currencyCode} />
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-text color="subdued">
+              Every code uses these unless it has its own tiers.
+            </s-text>
+            <s-link href="/app/settings">Edit</s-link>
+          </s-stack>
         </s-stack>
       </s-section>
 
       <s-section slot="aside" heading="Overview">
         <s-stack direction="block" gap="base">
-          <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-stack direction="block" gap="small-300">
-              <s-text color="subdued">Active codes</s-text>
-              <s-heading>{activeCodes}</s-heading>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-stack direction="block" gap="small-300">
-              <s-text color="subdued">Total codes created</s-text>
-              <s-heading>{totalCodes}</s-heading>
-            </s-stack>
-          </s-box>
-          <s-link href="/app/discounts">View all codes →</s-link>
+          <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
+            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
+              <s-stack direction="block" gap="none">
+                <s-text color="subdued">Active codes</s-text>
+                <s-heading>{activeLabel}</s-heading>
+              </s-stack>
+            </s-box>
+            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
+              <s-stack direction="block" gap="none">
+                <s-text color="subdued">All codes</s-text>
+                <s-heading>{totalLabel}</s-heading>
+              </s-stack>
+            </s-box>
+          </s-grid>
+          <s-link href="/app/discounts">View all codes</s-link>
         </s-stack>
       </s-section>
     </s-page>

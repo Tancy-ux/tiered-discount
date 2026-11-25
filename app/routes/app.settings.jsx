@@ -83,11 +83,11 @@ export default function Settings() {
           </s-paragraph>
 
           {!hasSavedTiers && (
-            <s-banner tone="info" heading="Using the built-in tiers">
-              <s-paragraph>
+            <s-box padding="small-200 base" background="subdued" borderRadius="base">
+              <s-text color="subdued">
                 {`You haven't saved your own tiers yet, so codes use the built-in ones: ${describeTiers(defaultTiers, currencyCode)}. Save to keep these or change them.`}
-              </s-paragraph>
-            </s-banner>
+              </s-text>
+            </s-box>
           )}
 
           <TierEditor

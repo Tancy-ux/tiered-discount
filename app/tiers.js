@@ -85,16 +85,16 @@ export function confirmLargeDiscount(tiers) {
   );
 }
 
-/** Shopify discount status → label and badge tone for the admin pages. */
+/** Shopify discount status → label, badge tone and icon for the admin pages. */
 export function statusBadge(status) {
   switch (status) {
     case "ACTIVE":
-      return { label: "Active", tone: "success" };
+      return { label: "Active", tone: "success", icon: "status-active" };
     case "SCHEDULED":
-      return { label: "Scheduled", tone: "info" };
+      return { label: "Scheduled", tone: "caution", icon: "clock" };
     case "EXPIRED":
-      return { label: "Paused or ended", tone: "neutral" };
+      return { label: "Paused or ended", tone: "neutral", icon: "pause-circle" };
     default:
-      return { label: status ?? "Unknown", tone: "neutral" };
+      return { label: status ?? "Unknown", tone: "neutral", icon: "status" };
   }
 }

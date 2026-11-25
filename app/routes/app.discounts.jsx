@@ -198,12 +198,21 @@ export default function Discounts() {
       <s-link slot="breadcrumb-actions" href="/app">
         Home
       </s-link>
+      {functionId && (
+        <s-button
+          slot="primary-action"
+          variant="primary"
+          href={`/app/discount/${functionId}/new`}
+        >
+          Create code
+        </s-button>
+      )}
+      <s-button slot="secondary-actions" href="/app/bulk-create">
+        Bulk create
+      </s-button>
 
       <s-section heading="Codes">
         <s-stack direction="block" gap="base">
-          <s-paragraph>
-            Need a new one? <s-link href="/app">Create a discount code</s-link>
-          </s-paragraph>
 
           <s-stack direction="inline" gap="base" alignItems="end">
             <s-search-field
@@ -274,7 +283,7 @@ export default function Discounts() {
                       <s-table-cell>{row.customerName}</s-table-cell>
                       <s-table-cell>
                         {row.customTiers ? (
-                          <s-badge tone="info">Custom</s-badge>
+                          <s-badge tone="accent" icon="wand">Custom</s-badge>
                         ) : (
                           "Default"
                         )}
@@ -286,7 +295,9 @@ export default function Discounts() {
                       </s-table-cell>
                       <s-table-cell>{row.sales}</s-table-cell>
                       <s-table-cell>
-                        <s-badge tone={badge.tone}>{badge.label}</s-badge>
+                        <s-badge tone={badge.tone} icon={badge.icon}>
+                          {badge.label}
+                        </s-badge>
                       </s-table-cell>
                     </s-table-row>
                   );

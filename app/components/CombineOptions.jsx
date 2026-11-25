@@ -47,7 +47,6 @@ export function CombineOptions({ value, onChange }) {
 
   return (
     <s-stack direction="block" gap="small-300">
-      <s-text type="strong">Combines with</s-text>
       {box("product", "Product discounts")}
       {box("order", "Other order discounts")}
       {box("shipping", "Shipping discounts")}
