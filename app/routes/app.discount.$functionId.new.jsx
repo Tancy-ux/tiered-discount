@@ -32,6 +32,9 @@ import {
   customerLockMetafields,
 } from "../discount-metafields.server";
 import { loadShop } from "../shop.server";
+import { codeFormatError, normalizeCode } from "../codes";
+import { findExistingCodes } from "../code-lookup.server";
+import { useCodeTaken } from "../components/useCodeTaken";
 import { isoToShopDate, shopDateToIso } from "../dates";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
@@ -59,7 +62,7 @@ export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
 
-  const code = formData.get("code")?.toString().trim().toUpperCase() ?? "";
+  const code = normalizeCode(formData.get("code"));
   const customerId = formData.get("customerId")?.toString().trim() ?? "";
   const startsAt = formData.get("startsAt")?.toString() ?? "";
   const endsAt = formData.get("endsAt")?.toString() ?? "";
@@ -70,7 +73,15 @@ export const action = async ({ request }) => {
   const combines = readCombines(formData);
 
   // Same checks as the form, so nothing invalid reaches Shopify.
-  if (!code) return { ok: false, error: "Enter a code." };
+  const formatError = codeFormatError(code);
+  if (formatError) return { ok: false, error: `${formatError}.` };
+  if ((await findExistingCodes(admin, [code])).length > 0) {
+    return {
+      ok: false,
+      error:
+        "A discount with this code already exists in your store. Choose another code.",
+    };
+  }
   const dateProblems = datesProblems(startsAt, endsAt);
   if (dateProblems.start || dateProblems.end) {
     return { ok: false, error: dateProblems.start ?? dateProblems.end };
@@ -179,9 +190,20 @@ export default function NewDiscount() {
     }
   }, [fetcher.data, shopify, navigate, functionId]);
 
+  const normalizedCode = normalizeCode(code);
+  const { taken: codeTaken } = useCodeTaken(code);
+  // Show format problems once something is typed.
+  const codeError = !normalizedCode
+    ? null
+    : (codeFormatError(normalizedCode) ??
+      (codeTaken
+        ? "A discount with this code already exists in your store"
+        : null));
+
   const dateProblems = datesProblems(startsAt, endsAt);
   const canSave =
-    Boolean(code.trim()) &&
+    Boolean(normalizedCode) &&
+    !codeError &&
     !isSaving &&
     !dateProblems.start &&
     !dateProblems.end &&
@@ -207,7 +229,7 @@ export default function NewDiscount() {
     }
     fetcher.submit(
       {
-        code: code.trim(),
+        code: normalizedCode,
         customerId: customer?.id ?? "",
         startsAt,
         endsAt,
@@ -276,6 +298,8 @@ export default function NewDiscount() {
           </s-stack>
           <s-text-field
             label="Discount code"
+            details="Letters, numbers, - and _ only. Saved in capitals."
+            {...(codeError ? { error: codeError } : {})}
             value={code}
             {...(codePrefix ? { placeholder: `${codePrefix}SUMMER` } : {})}
             onInput={(event) =>

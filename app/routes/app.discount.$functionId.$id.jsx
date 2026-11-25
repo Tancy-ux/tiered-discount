@@ -36,6 +36,9 @@ import {
 } from "../discount-metafields.server";
 import { isoToShopDate, shopDateToIso } from "../dates";
 import { copyText } from "../clipboard";
+import { codeFormatError, normalizeCode } from "../codes";
+import { findExistingCodes } from "../code-lookup.server";
+import { useCodeTaken } from "../components/useCodeTaken";
 
 /** "2026-12-31" → "31 Dec 2026" */
 function readableDate(dateString) {
@@ -325,7 +328,7 @@ export const action = async ({ params, request }) => {
     return redirect("/app/discounts");
   }
 
-  const code = formData.get("code")?.toString().trim() ?? "";
+  const code = normalizeCode(formData.get("code"));
   const customerId = formData.get("customerId")?.toString().trim() ?? "";
   const previousCustomerId =
     formData.get("previousCustomerId")?.toString().trim() ?? "";
@@ -345,11 +348,17 @@ export const action = async ({ params, request }) => {
   const useCustomTiers = formData.get("useCustomTiers") === "true";
   const hadCustomTiers = formData.get("hadCustomTiers") === "true";
 
-  if (!code) {
+  const formatError = codeFormatError(code);
+  if (formatError) {
+    return { ok: false, intent: "updateDiscount", error: `${formatError}.` };
+  }
+  // Renaming to a code another discount already uses (this one is ignored).
+  if ((await findExistingCodes(admin, [code], id)).length > 0) {
     return {
       ok: false,
       intent: "updateDiscount",
-      error: "Enter a code.",
+      error:
+        "A discount with this code already exists in your store. Choose another code.",
     };
   }
 
@@ -579,9 +588,24 @@ export default function DiscountDetail() {
   const tiersInvalid =
     useCustomTiers &&
     (customTiersDraft.length === 0 || hasBadTiers(customTiersDraft));
+  // Code name: format, and (only when renamed) whether it's already taken.
+  const normalizedCode = normalizeCode(code);
+  const codeChanged =
+    !loaderData.notFound && normalizedCode !== loaderData.code;
+  const { taken: codeTaken } = useCodeTaken(code, {
+    ignoreId: loaderData.notFound ? undefined : loaderData.id,
+    skip: !codeChanged,
+  });
+  const codeError = !normalizedCode
+    ? "Enter a code"
+    : (codeFormatError(normalizedCode) ??
+      (codeTaken
+        ? "A discount with this code already exists in your store"
+        : null));
+
   const dateProblems = datesProblems(startsAt, endsAt);
   const canSave =
-    Boolean(code.trim()) &&
+    !codeError &&
     isDirty &&
     !isSaving &&
     !tiersInvalid &&
@@ -658,7 +682,7 @@ export default function DiscountDetail() {
     }
     detailFetcher.submit(
       {
-        code: code.trim(),
+        code: normalizedCode,
         customerId: customer?.id ?? "",
         previousCustomerId: loaderData.customer?.id ?? "",
         ...combinesFormFields(combines),
@@ -769,6 +793,8 @@ export default function DiscountDetail() {
         <s-stack direction="block" gap="base">
           <s-text-field
             label="Discount code"
+            details="Letters, numbers, - and _ only. Saved in capitals."
+            {...(codeError ? { error: codeError } : {})}
             value={code}
             onInput={(event) =>
               setCode(event.currentTarget.value.toUpperCase())
