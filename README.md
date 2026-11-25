@@ -69,8 +69,9 @@ no manual price rule setup per order size.
   counts. Steps tick themselves off from the store's data; "Test it at
   checkout" is marked by the merchant. **Hide guide** removes it for good.
   Progress is stored in the shop metafield `tiered_discount.onboarding`.
-- **Send to customer:** a customer-specific code's page shows a ready-to-send
-  message with the code, its tiers, its end date (if any) and a reminder to
+- **Send to customer:** at the bottom of a customer-specific code's page, a
+  ready-to-send message (for the merchant to paste into email, SMS or WhatsApp;
+  the app sends nothing itself) with the code, its tiers, its end date (if any) and a reminder to
   log in before checkout, with a Copy message button. It's built from the
   saved code, so it never describes unsaved edits.
 - **More settings:** on the create page and a code's page, total uses, one

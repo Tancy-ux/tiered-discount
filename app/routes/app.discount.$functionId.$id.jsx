@@ -767,6 +767,19 @@ export default function DiscountDetail() {
         </s-stack>
       </s-section>
 
+      <MoreSettingsSection
+        slot="aside"
+        usageLimit={usageLimit}
+        onUsageLimitChange={setUsageLimit}
+        appliesOncePerCustomer={appliesOncePerCustomer}
+        onAppliesOncePerCustomerChange={setAppliesOncePerCustomer}
+        combines={combines}
+        onCombinesChange={setCombines}
+        notes={notes}
+        onNotesChange={setNotes}
+      />
+
+      {/* Last on the page: a message the merchant copies and sends. */}
       {customerMessage && (
         <s-section slot="aside" heading="Send to customer">
           <s-stack direction="block" gap="base">
@@ -788,18 +801,6 @@ export default function DiscountDetail() {
           </s-stack>
         </s-section>
       )}
-
-      <MoreSettingsSection
-        slot="aside"
-        usageLimit={usageLimit}
-        onUsageLimitChange={setUsageLimit}
-        appliesOncePerCustomer={appliesOncePerCustomer}
-        onAppliesOncePerCustomerChange={setAppliesOncePerCustomer}
-        combines={combines}
-        onCombinesChange={setCombines}
-        notes={notes}
-        onNotesChange={setNotes}
-      />
     </s-page>
   );
 }
