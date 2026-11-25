@@ -1,7 +1,11 @@
 /* eslint-disable react/prop-types */
 // Which other discounts a tiered code can be used together with.
 
-export const DEFAULT_COMBINES = { order: false, product: false, shipping: true };
+export const DEFAULT_COMBINES = {
+  order: false,
+  product: false,
+  shipping: true,
+};
 
 /** Shape Shopify's DiscountCombinesWithInput expects. */
 export function combinesWithInput(value) {
@@ -31,7 +35,9 @@ export function combinesFormFields(value) {
 }
 
 export function sameCombines(a, b) {
-  return a.order === b.order && a.product === b.product && a.shipping === b.shipping;
+  return (
+    a.order === b.order && a.product === b.product && a.shipping === b.shipping
+  );
 }
 
 export function CombineOptions({ value, onChange }) {

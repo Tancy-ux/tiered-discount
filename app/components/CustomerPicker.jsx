@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 
-export function CustomerPicker({ value, onChange }) {
+/** Customer search and chosen customer. `badge`: optional label shown beside a chosen customer. */
+export function CustomerPicker({ value, onChange, badge }) {
   const searchFetcher = useFetcher();
   const [searchTerm, setSearchTerm] = useState("");
   const searchResults = searchFetcher.data?.customers ?? [];
@@ -26,6 +27,7 @@ export function CustomerPicker({ value, onChange }) {
             <s-text type="strong">{value.displayName}</s-text>
             {value.email && <s-text color="subdued">{value.email}</s-text>}
           </s-stack>
+          {badge && <s-badge icon="lock">{badge}</s-badge>}
           <s-button variant="tertiary" onClick={() => onChange(null)}>
             Change
           </s-button>

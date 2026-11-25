@@ -35,9 +35,6 @@ import {
 } from "../discount-metafields.server";
 import { isoToShopDate, shopDateToIso } from "../dates";
 
-// Two columns on wide screens, one on narrow ones.
-const TWO_COLUMNS = "@container (inline-size > 520px) 1fr 1fr, 1fr";
-
 /** "2026-12-31" → "31 Dec 2026" */
 function readableDate(dateString) {
   const [year, month, day] = dateString.split("-").map(Number);
@@ -202,7 +199,10 @@ export const loader = async ({ params, request }) => {
     usageLimit: discount.usageLimit,
     used: discount.asyncUsageCount,
     sales: discount.totalSales
-      ? formatMoney(discount.totalSales.amount, discount.totalSales.currencyCode)
+      ? formatMoney(
+          discount.totalSales.amount,
+          discount.totalSales.currencyCode,
+        )
       : null,
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
     customer,
@@ -223,7 +223,8 @@ export const action = async ({ params, request }) => {
   if (intent === "pause" || intent === "resume") {
     // Pausing ends the code now (Shopify keeps it); resuming makes it
     // usable again with no end date.
-    const field = intent === "pause" ? "discountCodeDeactivate" : "discountCodeActivate";
+    const field =
+      intent === "pause" ? "discountCodeDeactivate" : "discountCodeActivate";
     const response = await admin.graphql(
       intent === "pause"
         ? `#graphql
@@ -313,7 +314,11 @@ export const action = async ({ params, request }) => {
 
   const limitProblem = usageLimitProblem(usageLimitRaw);
   if (limitProblem) {
-    return { ok: false, intent: "updateDiscount", error: `Total uses: ${limitProblem}.` };
+    return {
+      ok: false,
+      intent: "updateDiscount",
+      error: `Total uses: ${limitProblem}.`,
+    };
   }
 
   // Check the tiers before changing anything, so a bad tier never leaves
@@ -325,8 +330,7 @@ export const action = async ({ params, request }) => {
     customTiers = tiers;
   }
 
-  const timeZone =
-    startsAt || endsAt ? await loadShopTimeZone(admin) : "UTC";
+  const timeZone = startsAt || endsAt ? await loadShopTimeZone(admin) : "UTC";
   const dates = {};
   if (startsAt) dates.startsAt = shopDateToIso(startsAt, timeZone);
   if (endsAt !== null) {
@@ -497,7 +501,11 @@ export default function DiscountDetail() {
     if (saved) setCustomTiersDraft(saved);
   }, [savedCustomKey]);
 
-  const [notes, setNotes] = useState(loaderData.notFound ? "" : loaderData.notes);
+  const [notes, setNotes] = useState(
+    loaderData.notFound ? "" : loaderData.notes,
+  );
+  // The customer message starts folded away.
+  const [messageOpen, setMessageOpen] = useState(false);
 
   const isSaving = detailFetcher.state !== "idle";
   const isDeleting = deleteFetcher.state !== "idle";
@@ -588,7 +596,9 @@ export default function DiscountDetail() {
 
   const handleDelete = () => {
     if (isDeleting) return;
-    if (!confirm(`Delete the code "${loaderData.code}"? This can't be undone.`)) {
+    if (
+      !confirm(`Delete the code "${loaderData.code}"? This can't be undone.`)
+    ) {
       return;
     }
     deleteFetcher.submit({ intent: "delete" }, { method: "post" });
@@ -687,7 +697,7 @@ export default function DiscountDetail() {
       )}
 
       <s-section heading="Code">
-        <s-grid gridTemplateColumns={TWO_COLUMNS} gap="base">
+        <s-stack direction="block" gap="base">
           <s-text-field
             label="Discount code"
             value={code}
@@ -703,8 +713,19 @@ export default function DiscountDetail() {
               accessibilityLabel="Copy code"
             ></s-button>
           </s-text-field>
-          <CustomerPicker value={customer} onChange={setCustomer} />
-        </s-grid>
+          <s-stack direction="block" gap="small-300">
+            <CustomerPicker
+              value={customer}
+              onChange={setCustomer}
+              badge="Logged-in only"
+            />
+            <s-text color="subdued">
+              {customer
+                ? `Only ${customer.displayName} can use this code, and only while logged in.`
+                : "Anyone with the code can use it. Pick a customer to make it theirs only."}
+            </s-text>
+          </s-stack>
+        </s-stack>
       </s-section>
 
       <TiersSection
@@ -732,38 +753,28 @@ export default function DiscountDetail() {
       <s-section slot="aside" heading="Summary">
         <s-stack direction="block" gap="base">
           <s-stack direction="block" gap="none">
+            <s-text color="subdued">Made for</s-text>
             <s-text type="strong">
               {loaderData.customer
                 ? `${loaderData.customer.displayName} only`
                 : "Anyone with the code"}
             </s-text>
-            {loaderData.customer && (
-              <s-text color="subdued">
-                {loaderData.customer.email
-                  ? `${loaderData.customer.email} · must be logged in`
-                  : "Must be logged in to use it"}
-              </s-text>
-            )}
           </s-stack>
-          <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
-            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
-              <s-stack direction="block" gap="none">
-                <s-text color="subdued">Used</s-text>
-                <s-text type="strong">
-                  {loaderData.usageLimit
-                    ? `${loaderData.used} of ${loaderData.usageLimit}`
-                    : `${loaderData.used} ${loaderData.used === 1 ? "time" : "times"}`}
-                </s-text>
-              </s-stack>
-            </s-box>
-            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
-              <s-stack direction="block" gap="none">
-                <s-text color="subdued">Sales</s-text>
-                <s-text type="strong">{loaderData.sales ?? "—"}</s-text>
-              </s-stack>
-            </s-box>
-          </s-grid>
-          <s-text color="subdued">Usage and sales can take a few minutes to update.</s-text>
+          <s-stack direction="block" gap="none">
+            <s-text color="subdued">Used</s-text>
+            <s-text type="strong">
+              {loaderData.usageLimit
+                ? `${loaderData.used} of ${loaderData.usageLimit} times`
+                : `${loaderData.used} ${loaderData.used === 1 ? "time" : "times"}`}
+            </s-text>
+          </s-stack>
+          <s-stack direction="block" gap="none">
+            <s-text color="subdued">Sales from this code</s-text>
+            <s-text type="strong">{loaderData.sales ?? "—"}</s-text>
+          </s-stack>
+          <s-text color="subdued">
+            Usage and sales can take a few minutes to update.
+          </s-text>
         </s-stack>
       </s-section>
 
@@ -783,22 +794,45 @@ export default function DiscountDetail() {
       {customerMessage && (
         <s-section slot="aside" heading="Send to customer">
           <s-stack direction="block" gap="base">
-            <s-box padding="small-200 base" background="subdued" borderRadius="base">
-              <s-stack direction="block" gap="small-200">
-                {customerMessage.map((line) => (
-                  <s-text key={line}>{line}</s-text>
-                ))}
-              </s-stack>
-            </s-box>
-            {isDirty && (
-              <s-text color="subdued">Save your changes to update this message.</s-text>
-            )}
+            <s-text color="subdued">
+              A ready-made message to paste into email, SMS or WhatsApp, with
+              the code and how to use it.
+            </s-text>
             <s-stack direction="inline">
-              <s-button icon="clipboard" onClick={handleCopyMessage}>
-                Copy message
+              <s-button
+                variant="tertiary"
+                icon={messageOpen ? "chevron-up" : "chevron-down"}
+                onClick={() => setMessageOpen(!messageOpen)}
+              >
+                {messageOpen ? "Hide message" : "Show message"}
               </s-button>
             </s-stack>
           </s-stack>
+          {messageOpen && (
+            <s-stack direction="block" gap="base">
+              <s-box
+                padding="small-200 base"
+                background="subdued"
+                borderRadius="base"
+              >
+                <s-stack direction="block" gap="small-200">
+                  {customerMessage.map((line) => (
+                    <s-text key={line}>{line}</s-text>
+                  ))}
+                </s-stack>
+              </s-box>
+              {isDirty && (
+                <s-text color="subdued">
+                  Save your changes to update this message.
+                </s-text>
+              )}
+              <s-stack direction="inline">
+                <s-button icon="clipboard" onClick={handleCopyMessage}>
+                  Copy message
+                </s-button>
+              </s-stack>
+            </s-stack>
+          )}
         </s-section>
       )}
     </s-page>

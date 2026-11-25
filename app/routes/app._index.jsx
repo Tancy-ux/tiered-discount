@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -6,6 +6,7 @@ import { authenticate } from "../shopify.server";
 import { TierSummary } from "../components/TierEditor";
 import { syncCustomerLocks } from "../discount-metafields.server";
 import { loadShop, saveOnboarding } from "../shop.server";
+import { formatMoney, statusBadge, tierForAmount } from "../tiers";
 
 function legacyId(gid) {
   return gid.split("/").pop();
@@ -29,15 +30,33 @@ export const loader = async ({ request }) => {
             id
           }
         }
-        discountNodes(first: 100, query: "method:code type:app") {
+        discountNodes(first: 100, reverse: true, query: "method:code type:app") {
           pageInfo {
             hasNextPage
           }
           nodes {
+            id
             discount {
               __typename
               ... on DiscountCodeApp {
+                title
                 status
+                asyncUsageCount
+                totalSales {
+                  amount
+                }
+                codes(first: 1) {
+                  nodes {
+                    code
+                  }
+                }
+                context {
+                  ... on DiscountCustomers {
+                    customers {
+                      displayName
+                    }
+                  }
+                }
                 appDiscountType {
                   app {
                     id
@@ -80,7 +99,21 @@ export const loader = async ({ request }) => {
     hasSavedTiers: shop.hasSavedTiers,
     onboarding: shop.onboarding,
     totalCodes: codes.length,
-    totalLabel: `${codes.length}${more}`,
+    timesUsed: `${codes.reduce((sum, node) => sum + (node.discount.asyncUsageCount ?? 0), 0)}${more}`,
+    sales: formatMoney(
+      codes.reduce(
+        (sum, node) => sum + Number(node.discount.totalSales?.amount ?? 0),
+        0,
+      ),
+      shop.currencyCode,
+    ),
+    // Newest first (the query is reversed).
+    recentCodes: codes.slice(0, 4).map((node) => ({
+      id: legacyId(node.id),
+      code: node.discount.codes.nodes[0]?.code ?? node.discount.title,
+      forWho: node.discount.context?.customers?.[0]?.displayName ?? "Anyone",
+      status: node.discount.status,
+    })),
     activeLabel: `${codes.filter((node) => node.discount.status === "ACTIVE").length}${more}`,
     functionId: tieredFunction ? legacyId(tieredFunction.id) : null,
   };
@@ -107,8 +140,16 @@ export const action = async ({ request }) => {
 // eslint-disable-next-line react/prop-types
 function GuideStep({ done, title, details, action }) {
   return (
-    <s-box padding="small-200 base" {...(done ? {} : { background: "subdued" })} borderRadius="base">
-      <s-grid gridTemplateColumns="auto 1fr auto" gap="base" alignItems="center">
+    <s-box
+      padding="small-200 base"
+      {...(done ? {} : { background: "subdued" })}
+      borderRadius="base"
+    >
+      <s-grid
+        gridTemplateColumns="auto 1fr auto"
+        gap="base"
+        alignItems="center"
+      >
         <s-icon
           type={done ? "check-circle-filled" : "circle-dashed"}
           {...(done ? { tone: "success" } : {})}
@@ -132,10 +173,14 @@ export default function Home() {
     hasSavedTiers,
     onboarding,
     totalCodes,
-    totalLabel,
     activeLabel,
+    timesUsed,
+    sales,
+    recentCodes,
     functionId,
   } = useLoaderData();
+  const [cartAmount, setCartAmount] = useState("75000");
+  const check = tierForAmount(defaultTiers, cartAmount);
   const guideFetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -167,7 +212,11 @@ export default function Home() {
       {showGuide && (
         <s-section>
           <s-stack direction="block" gap="base">
-            <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+            <s-stack
+              direction="inline"
+              justifyContent="space-between"
+              alignItems="center"
+            >
               <s-stack direction="block" gap="none">
                 <s-heading>Get started</s-heading>
                 <s-text color="subdued">{`${doneCount} of ${steps.length} steps done`}</s-text>
@@ -213,7 +262,9 @@ export default function Home() {
                 details="Log in to your store as that customer, add items, and enter the code."
                 action={
                   <s-button
-                    {...(isSavingGuide ? { disabled: true, loading: true } : {})}
+                    {...(isSavingGuide
+                      ? { disabled: true, loading: true }
+                      : {})}
                     onClick={() => submitGuide("markTested")}
                   >
                     Mark as done
@@ -225,9 +276,44 @@ export default function Home() {
         </s-section>
       )}
 
+      <s-section heading="At a glance">
+        <s-grid gridTemplateColumns="1fr 1fr 1fr" gap="base">
+          <s-stack direction="block" gap="none">
+            <s-text color="subdued">Active codes</s-text>
+            <s-heading>{activeLabel}</s-heading>
+          </s-stack>
+          <s-stack direction="block" gap="none">
+            <s-text color="subdued">Times used</s-text>
+            <s-heading>{timesUsed}</s-heading>
+          </s-stack>
+          <s-stack direction="block" gap="none">
+            <s-text color="subdued">Sales from codes</s-text>
+            <s-heading>{sales}</s-heading>
+          </s-stack>
+        </s-grid>
+      </s-section>
+
       <s-section heading="Your default tiers">
         <s-stack direction="block" gap="base">
           <TierSummary tiers={defaultTiers} currencyCode={currencyCode} />
+          <s-divider></s-divider>
+          <s-stack direction="inline" gap="base" alignItems="center">
+            <s-number-field
+              label="Check a cart amount"
+              min={0}
+              prefix={currencyCode}
+              value={cartAmount}
+              onInput={(event) => setCartAmount(event.currentTarget.value)}
+            ></s-number-field>
+            <s-text>
+              {check.tier
+                ? `Gets ${check.tier.percentage}% off (saves ${formatMoney(check.saving, currencyCode)}).`
+                : "No discount yet."}
+              {check.next
+                ? ` ${formatMoney(check.toNext, currencyCode)} more reaches ${check.next.percentage}%.`
+                : ""}
+            </s-text>
+          </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-text color="subdued">
               Every code uses these unless it has its own tiers.
@@ -237,23 +323,48 @@ export default function Home() {
         </s-stack>
       </s-section>
 
-      <s-section slot="aside" heading="Overview">
+      <s-section heading="Recent codes">
         <s-stack direction="block" gap="base">
-          <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
-            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
-              <s-stack direction="block" gap="none">
-                <s-text color="subdued">Active codes</s-text>
-                <s-heading>{activeLabel}</s-heading>
-              </s-stack>
-            </s-box>
-            <s-box padding="small-200 base" borderWidth="base" borderRadius="base">
-              <s-stack direction="block" gap="none">
-                <s-text color="subdued">All codes</s-text>
-                <s-heading>{totalLabel}</s-heading>
-              </s-stack>
-            </s-box>
-          </s-grid>
-          <s-link href="/app/discounts">View all codes</s-link>
+          {recentCodes.length === 0 ? (
+            <s-text color="subdued">No codes yet.</s-text>
+          ) : (
+            <s-table>
+              <s-table-header-row>
+                <s-table-header>Code</s-table-header>
+                <s-table-header>For</s-table-header>
+                <s-table-header>Status</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {recentCodes.map((row) => {
+                  const badge = statusBadge(row.status);
+                  return (
+                    <s-table-row key={row.id}>
+                      <s-table-cell>
+                        {functionId ? (
+                          <s-link
+                            href={`/app/discount/${functionId}/${row.id}`}
+                          >
+                            {row.code}
+                          </s-link>
+                        ) : (
+                          row.code
+                        )}
+                      </s-table-cell>
+                      <s-table-cell>{row.forWho}</s-table-cell>
+                      <s-table-cell>
+                        <s-badge tone={badge.tone} icon={badge.icon}>
+                          {badge.label}
+                        </s-badge>
+                      </s-table-cell>
+                    </s-table-row>
+                  );
+                })}
+              </s-table-body>
+            </s-table>
+          )}
+          {totalCodes > recentCodes.length && (
+            <s-link href="/app/discounts">View all codes</s-link>
+          )}
         </s-stack>
       </s-section>
     </s-page>

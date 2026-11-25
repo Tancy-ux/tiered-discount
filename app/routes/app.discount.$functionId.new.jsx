@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { useFetcher, useLoaderData, useNavigate, useParams } from "react-router";
+import {
+  useFetcher,
+  useLoaderData,
+  useNavigate,
+  useParams,
+} from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -58,7 +63,8 @@ export const action = async ({ request }) => {
   const startsAt = formData.get("startsAt")?.toString() ?? "";
   const endsAt = formData.get("endsAt")?.toString() ?? "";
   const usageLimitRaw = formData.get("usageLimit")?.toString().trim() ?? "";
-  const appliesOncePerCustomer = formData.get("appliesOncePerCustomer") === "true";
+  const appliesOncePerCustomer =
+    formData.get("appliesOncePerCustomer") === "true";
   const notes = formData.get("notes")?.toString() ?? "";
   const combines = readCombines(formData);
 
@@ -83,7 +89,14 @@ export const action = async ({ request }) => {
     ...customerLockMetafields(customerId),
     ...codeTiersMetafields(customTiers),
     ...(notes.trim()
-      ? [{ namespace: NAMESPACE, key: "notes", type: "multi_line_text_field", value: notes }]
+      ? [
+          {
+            namespace: NAMESPACE,
+            key: "notes",
+            type: "multi_line_text_field",
+            value: notes,
+          },
+        ]
       : []),
   ];
 
@@ -113,7 +126,9 @@ export const action = async ({ request }) => {
           usageLimit: usageLimitRaw ? Number(usageLimitRaw) : null,
           appliesOncePerCustomer,
           // No customer: Shopify's default, open to all buyers.
-          ...(customerId ? { context: { customers: { add: [customerId] } } } : {}),
+          ...(customerId
+            ? { context: { customers: { add: [customerId] } } }
+            : {}),
           ...(metafields.length > 0 ? { metafields } : {}),
         },
       },
@@ -175,7 +190,8 @@ export default function NewDiscount() {
   const handleCustomerChange = (picked) => {
     setCustomer(picked);
     // Suggest a code until the merchant types their own.
-    if (picked && !code.trim()) setCode(suggestCode(codePrefix, picked.displayName));
+    if (picked && !code.trim())
+      setCode(suggestCode(codePrefix, picked.displayName));
   };
 
   const handleSave = () => {
@@ -225,7 +241,11 @@ export default function NewDiscount() {
       <s-section heading="Code">
         <s-stack direction="block" gap="base">
           <s-stack direction="block" gap="small-300">
-            <CustomerPicker value={customer} onChange={handleCustomerChange} />
+            <CustomerPicker
+              value={customer}
+              onChange={handleCustomerChange}
+              badge="Logged-in only"
+            />
             <s-text color="subdued">
               Optional. Only this customer can use the code, and only when
               logged in. Leave empty for anyone with the code.
@@ -235,7 +255,9 @@ export default function NewDiscount() {
             label="Discount code"
             value={code}
             {...(codePrefix ? { placeholder: `${codePrefix}SUMMER` } : {})}
-            onInput={(event) => setCode(event.currentTarget.value.toUpperCase())}
+            onInput={(event) =>
+              setCode(event.currentTarget.value.toUpperCase())
+            }
           ></s-text-field>
         </s-stack>
       </s-section>

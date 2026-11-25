@@ -93,8 +93,36 @@ export function statusBadge(status) {
     case "SCHEDULED":
       return { label: "Scheduled", tone: "caution", icon: "clock" };
     case "EXPIRED":
-      return { label: "Paused or ended", tone: "neutral", icon: "pause-circle" };
+      return {
+        label: "Paused or ended",
+        tone: "neutral",
+        icon: "pause-circle",
+      };
     default:
       return { label: status ?? "Unknown", tone: "neutral", icon: "status" };
   }
+}
+
+/**
+ * The tier a cart amount reaches, what it saves, and how far the next tier is.
+ * @returns {{ tier: {minSubtotal:number, percentage:number} | null, saving: number,
+ *   next: {minSubtotal:number, percentage:number} | null, toNext: number }}
+ */
+export function tierForAmount(tiers, amount) {
+  const sorted = tiersForSubmit(tiers).sort(
+    (a, b) => a.minSubtotal - b.minSubtotal,
+  );
+  const value = Number(amount) || 0;
+  let tier = null;
+  for (const candidate of sorted) {
+    if (value >= candidate.minSubtotal) tier = candidate;
+  }
+  const next =
+    sorted.find((candidate) => candidate.minSubtotal > value) ?? null;
+  return {
+    tier,
+    saving: tier ? Math.round(value * tier.percentage) / 100 : 0,
+    next,
+    toNext: next ? next.minSubtotal - value : 0,
+  };
 }

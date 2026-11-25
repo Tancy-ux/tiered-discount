@@ -23,21 +23,27 @@ export function amountError(tiers, index) {
   if (!Number.isFinite(amount) || amount < 0) return "Enter 0 or more";
   const usedEarlier = tiers
     .slice(0, index)
-    .some((tier) => !isBlank(tier.minSubtotal) && Number(tier.minSubtotal) === amount);
+    .some(
+      (tier) =>
+        !isBlank(tier.minSubtotal) && Number(tier.minSubtotal) === amount,
+    );
   return usedEarlier ? "Another tier uses this amount" : null;
 }
 
 /** True when any tier is invalid, so saving is blocked. */
 export function hasBadTiers(tiers) {
   return tiers.some(
-    (tier, index) => percentageError(tier.percentage) || amountError(tiers, index),
+    (tier, index) =>
+      percentageError(tier.percentage) || amountError(tiers, index),
   );
 }
 
 export function TierEditor({ tiers, onChange, currencyCode }) {
   const handleTierChange = (index, field, value) => {
     onChange(
-      tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier)),
+      tiers.map((tier, i) =>
+        i === index ? { ...tier, [field]: value } : tier,
+      ),
     );
   };
 
@@ -64,7 +70,11 @@ export function TierEditor({ tiers, onChange, currencyCode }) {
               {...(amountProblem ? { error: amountProblem } : {})}
               value={String(tier.minSubtotal)}
               onInput={(event) =>
-                handleTierChange(index, "minSubtotal", event.currentTarget.value)
+                handleTierChange(
+                  index,
+                  "minSubtotal",
+                  event.currentTarget.value,
+                )
               }
             ></s-number-field>
             <s-number-field
@@ -106,7 +116,9 @@ export function TierEditor({ tiers, onChange, currencyCode }) {
 
 /** Read-only tiers: "₹50,000 and up → 7.5% off", one line each. */
 export function TierSummary({ tiers, currencyCode }) {
-  const sorted = tiersForSubmit(tiers).sort((a, b) => a.minSubtotal - b.minSubtotal);
+  const sorted = tiersForSubmit(tiers).sort(
+    (a, b) => a.minSubtotal - b.minSubtotal,
+  );
   return (
     <s-stack direction="block" gap="small-300">
       {sorted.map((tier, index) => (

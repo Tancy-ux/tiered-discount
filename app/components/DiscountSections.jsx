@@ -1,7 +1,6 @@
 /* eslint-disable react/prop-types */
 // Page sections shared by the create page and a code's page, so both look
 // and validate the same.
-import { useState } from "react";
 import { TierEditor, TierSummary } from "./TierEditor";
 import { CombineOptions } from "./CombineOptions";
 
@@ -61,7 +60,11 @@ export function TiersSection({
           </>
         ) : (
           <>
-            <s-box padding="small-200 base" background="subdued" borderRadius="base">
+            <s-box
+              padding="small-200 base"
+              background="subdued"
+              borderRadius="base"
+            >
               <TierSummary tiers={defaultTiers} currencyCode={currencyCode} />
             </s-box>
             <s-stack direction="inline" gap="small-200" alignItems="center">
@@ -75,12 +78,17 @@ export function TiersSection({
   );
 }
 
-export function DatesSection({ startsAt, endsAt, onStartsAtChange, onEndsAtChange }) {
+export function DatesSection({
+  startsAt,
+  endsAt,
+  onStartsAtChange,
+  onEndsAtChange,
+}) {
   const problems = datesProblems(startsAt, endsAt);
   return (
     <s-section heading="Active dates">
-      <s-stack direction="block" gap="small-200">
-        <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+      <s-stack direction="block" gap="base">
+        <s-stack direction="block" gap="base">
           <s-date-field
             label="Start date"
             {...(problems.start ? { error: problems.start } : {})}
@@ -93,7 +101,7 @@ export function DatesSection({ startsAt, endsAt, onStartsAtChange, onEndsAtChang
             value={endsAt}
             onChange={(event) => onEndsAtChange(event.currentTarget.value)}
           ></s-date-field>
-        </s-grid>
+        </s-stack>
         <s-text color="subdued">
           Dates use your store&apos;s time zone. The code works until the end of
           its end date.
@@ -111,26 +119,7 @@ export function CombinesSection({ combines, onCombinesChange, slot }) {
   );
 }
 
-/** One-line summary of the settings folded into More settings. */
-function moreSettingsSummary({ usageLimit, appliesOncePerCustomer, combines, notes }) {
-  const limit = String(usageLimit ?? "").trim();
-  const uses = limit ? `Up to ${limit} uses` : "Unlimited uses";
-  const perCustomer = appliesOncePerCustomer ? ", one per customer" : "";
-  const combineNames = [
-    combines.product && "product",
-    combines.order && "order",
-    combines.shipping && "shipping",
-  ].filter(Boolean);
-  const combine = combineNames.length
-    ? `Combines with ${combineNames.join(", ")} discounts`
-    : "Doesn't combine";
-  return [`${uses}${perCustomer}`, combine, notes.trim() ? "Has notes" : "No notes"].join(" · ");
-}
-
-/**
- * Usage limits, combinations and notes in one section that starts closed,
- * with a summary line. Opens by itself when a field has an error.
- */
+/** Usage limits, combinations and notes, shown open in one section. */
 export function MoreSettingsSection({
   usageLimit,
   onUsageLimitChange,
@@ -142,59 +131,37 @@ export function MoreSettingsSection({
   onNotesChange,
   slot,
 }) {
-  const [userOpen, setUserOpen] = useState(false);
   const problem = usageLimitProblem(usageLimit);
-  const open = userOpen || Boolean(problem);
   return (
     <s-section heading="More settings" {...(slot ? { slot } : {})}>
       <s-stack direction="block" gap="base">
-        <s-stack direction="block" gap="small-200">
-          <s-text color="subdued">
-            {moreSettingsSummary({ usageLimit, appliesOncePerCustomer, combines, notes })}
-          </s-text>
-          <s-stack direction="inline">
-            <s-button
-              variant="tertiary"
-              icon={open ? "chevron-up" : "chevron-down"}
-              {...(problem ? { disabled: true } : {})}
-              onClick={() => setUserOpen(!open)}
-            >
-              {open ? "Hide settings" : "Show settings"}
-            </s-button>
-          </s-stack>
-        </s-stack>
-        {open && (
-          <>
-            <s-divider></s-divider>
-            <s-number-field
-              label="Total uses"
-              placeholder="Unlimited"
-              min={1}
-              step={1}
-              {...(problem ? { error: problem } : {})}
-              value={String(usageLimit ?? "")}
-              onInput={(event) => onUsageLimitChange(event.currentTarget.value)}
-            ></s-number-field>
-            <s-checkbox
-              label="One use per customer"
-              {...(appliesOncePerCustomer ? { checked: true } : {})}
-              onChange={(event) =>
-                onAppliesOncePerCustomerChange(event.currentTarget.checked)
-              }
-            ></s-checkbox>
-            <s-divider></s-divider>
-            <s-text type="strong">Combines with</s-text>
-            <CombineOptions value={combines} onChange={onCombinesChange} />
-            <s-divider></s-divider>
-            <s-text-area
-              label="Notes"
-              placeholder="Only you see these"
-              rows={3}
-              value={notes}
-              onInput={(event) => onNotesChange(event.currentTarget.value)}
-            ></s-text-area>
-          </>
-        )}
+        <s-number-field
+          label="Total uses"
+          placeholder="Unlimited"
+          min={1}
+          step={1}
+          {...(problem ? { error: problem } : {})}
+          value={String(usageLimit ?? "")}
+          onInput={(event) => onUsageLimitChange(event.currentTarget.value)}
+        ></s-number-field>
+        <s-checkbox
+          label="One use per customer"
+          {...(appliesOncePerCustomer ? { checked: true } : {})}
+          onChange={(event) =>
+            onAppliesOncePerCustomerChange(event.currentTarget.checked)
+          }
+        ></s-checkbox>
+        <s-divider></s-divider>
+        <s-text type="strong">Combines with</s-text>
+        <CombineOptions value={combines} onChange={onCombinesChange} />
+        <s-divider></s-divider>
+        <s-text-area
+          label="Notes"
+          placeholder="Only you see these"
+          rows={3}
+          value={notes}
+          onInput={(event) => onNotesChange(event.currentTarget.value)}
+        ></s-text-area>
       </s-stack>
     </s-section>
   );

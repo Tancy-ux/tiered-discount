@@ -63,30 +63,36 @@ no manual price rule setup per order size.
   default tiers, start/end dates, total uses, one use per customer,
   combinations and notes. Total uses must be a whole number of 1 or more, or
   empty for unlimited.
-- **Home page:** Create code and Bulk create buttons, a **Get started** guide
-  (set your default tiers → create your first code → test it at checkout,
-  with a progress bar), the default tiers as a short list, and active/all code
-  counts. Steps tick themselves off from the store's data; "Test it at
-  checkout" is marked by the merchant. **Hide guide** removes it for good.
-  Progress is stored in the shop metafield `tiered_discount.onboarding`.
-- **Send to customer:** at the bottom of a customer-specific code's page, a
-  ready-to-send message (for the merchant to paste into email, SMS or WhatsApp;
-  the app sends nothing itself) with the code, its tiers, its end date (if any) and a reminder to
-  log in before checkout, with a Copy message button. It's built from the
-  saved code, so it never describes unsaved edits.
+- **Home page:** Create code and Bulk create buttons, then:
+  - a **Get started** guide (set your default tiers → create your first code
+    → test it at checkout, with a progress bar). Steps tick themselves off
+    from the store's data; "Test it at checkout" is marked by the merchant.
+    **Hide guide** removes it for good. Progress is stored in the shop
+    metafield `tiered_discount.onboarding`.
+  - **At a glance:** active codes, times used and sales from codes, added up
+    over the newest 100 app codes ("+" when there are more).
+  - **Your default tiers** as a short list, with **Check a cart amount**: type
+    an amount to see which tier it reaches, what it saves and how much more
+    reaches the next tier.
+  - **Recent codes:** the newest four, with who they're for and their status.
+- **Code page layout:** one field per line (code, then customer; start date,
+  then end date) with the status badge next to the code name. A chosen
+  customer shows a **Logged-in only** badge and a line saying only they can
+  use the code. The Summary lists who it's for, times used and sales.
 - **More settings:** on the create page and a code's page, total uses, one
-  use per customer, combinations and notes sit in one section that starts
-  closed and shows a one-line summary ("Unlimited uses · Combines with
-  shipping discounts · No notes"). It opens by itself if one of its fields
-  has an error.
-- **Compact layout:** the code page puts the code and customer side by side,
-  start and end dates side by side, and the status badge next to the code
-  name. Tier rows show column labels once, amounts carry the currency, and
-  read-only tiers show as a short list ("₹50,000 and up → 7.5% off").
-  Colour is kept to meaning: status badges are green (Active), yellow
-  (Scheduled) or grey (Paused or ended) with an icon, tier discounts show as
-  grey pills, and the Custom tiers badge uses Shopify's accent purple. Notes
-  that used light-blue info banners are plain grey boxes.
+  use per customer, combinations and notes sit together in one open section.
+- **Send to customer:** last on a customer-specific code's page, folded away
+  behind **Show message**. It's a ready-to-send message for the merchant to
+  paste into email, SMS or WhatsApp (the app sends nothing itself) with the
+  code, its tiers, its end date (if any) and a reminder to log in before
+  checkout, plus a Copy message button. It's built from the saved code, so it
+  never describes unsaved edits.
+- **Look:** tier rows show column labels once, amounts carry the currency, and
+  read-only tiers show as a short list ("₹50,000 and up → 7.5% off"). Colour
+  is kept to meaning: status badges are green (Active), yellow (Scheduled) or
+  grey (Paused or ended) with an icon, tier discounts show as grey pills, and
+  the Custom tiers badge uses Shopify's accent purple. Notes that used
+  light-blue info banners are plain grey boxes.
 - **Customer-specific codes only work for that customer, signed in.** The app
   stores the allowed customer IDs on the discount (`tiered_discount.customer_id`)
   and the Function gives no discount unless one of them is logged in to their
