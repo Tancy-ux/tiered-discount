@@ -11,7 +11,7 @@ export default function Privacy() {
         color: "#1a1a1a",
       }}
     >
-      <h1>Privacy Policy - Tiered Order Discount</h1>
+      <h1>Privacy Policy - Ware - Tiered Discounts</h1>
       <p>Last updated: {new Date().toISOString().slice(0, 10)}</p>
 
       <p>
@@ -27,6 +27,14 @@ export default function Privacy() {
           search for and optionally restrict a discount code to a specific
           customer. Search results are fetched live from Shopify and are not
           stored by this app.
+        </li>
+        <li>
+          <strong>Customer ID on customer-specific codes</strong> - when a
+          merchant restricts a code to a customer, that customer&apos;s Shopify
+          customer ID is saved on the discount, inside the merchant&apos;s own
+          Shopify store. At checkout, the discount is checked against the
+          signed-in customer&apos;s ID so only that customer gets it. No name,
+          email or other details are saved, and nothing leaves Shopify.
         </li>
         <li>
           <strong>Discount data</strong> - the discount codes, tiers, and
@@ -50,9 +58,10 @@ export default function Privacy() {
       <h2>Data retention and deletion</h2>
       <p>
         When the app is uninstalled, its access token and session data are
-        deleted. Because customer data is never persisted by this app outside of
-        Shopify, there is no separate customer data to erase on request beyond
-        what Shopify itself already manages.
+        deleted. The app never keeps customer data outside of Shopify. When
+        Shopify asks for a customer&apos;s data to be erased, the app removes
+        that customer&apos;s ID from every discount code. A code that was made
+        only for that customer is ended, so it can&apos;t be used by anyone.
       </p>
 
       <h2>Contact</h2>

@@ -42,12 +42,29 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
+  // Customer-specific codes: only the assigned customer, signed in, gets the
+  // discount. Logged-out shoppers and other customers get nothing.
+  const lockedTo = (input.discount.customerLock?.value ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (lockedTo.length > 0) {
+    const buyerId = input.cart.buyerIdentity?.customer?.id;
+    if (!buyerId || !lockedTo.includes(buyerId)) {
+      return { operations: [] };
+    }
+  }
+
   const subtotal = Number(input.cart.cost.subtotalAmount.amount);
   if (!Number.isFinite(subtotal)) {
     return { operations: [] };
   }
 
-  const tiers = parseTiers(input.shop?.metafield?.value) ?? DEFAULT_TIERS;
+  // This code's own tiers win; otherwise the shop's default tiers.
+  const tiers =
+    parseTiers(input.discount.codeTiers?.value) ??
+    parseTiers(input.shop?.metafield?.value) ??
+    DEFAULT_TIERS;
   const tier = pickTier(tiers, subtotal);
 
   if (!tier || tier.percentage <= 0) {
@@ -115,7 +132,8 @@ function parseTiers(raw) {
           Number.isFinite(t.minSubtotal) &&
           Number.isFinite(t.percentage) &&
           t.minSubtotal >= 0 &&
-          t.percentage >= 0,
+          t.percentage >= 0 &&
+          t.percentage <= 100,
       )
       .sort((a, b) => a.minSubtotal - b.minSubtotal);
 

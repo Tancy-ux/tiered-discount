@@ -13,12 +13,25 @@ export const loader = async ({ request }) => {
   const response = await admin.graphql(
     `#graphql
       query ExistingDiscountCodes {
-        discountNodes(first: 50, reverse: true, query: "method:code type:app") {
+        currentAppInstallation {
+          app {
+            id
+          }
+        }
+        discountNodes(first: 100, reverse: true, query: "method:code type:app") {
           nodes {
             id
+            codeTiers: metafield(namespace: "tiered_discount", key: "tiers") {
+              id
+            }
             discount {
               __typename
               ... on DiscountCodeApp {
+                appDiscountType {
+                  app {
+                    id
+                  }
+                }
                 title
                 status
                 codes(first: 1) {
@@ -52,8 +65,14 @@ export const loader = async ({ request }) => {
     data.shopifyFunctions.nodes.find((node) => node.title === "Tiered order discount") ??
     data.shopifyFunctions.nodes[0];
 
+  // "type:app" also returns other apps' discounts; keep only this app's codes.
+  const appId = data.currentAppInstallation.app.id;
   const codes = data.discountNodes.nodes
-    .filter((node) => node.discount.__typename === "DiscountCodeApp")
+    .filter(
+      (node) =>
+        node.discount.__typename === "DiscountCodeApp" &&
+        node.discount.appDiscountType?.app?.id === appId,
+    )
     .map((node) => {
       const discount = node.discount;
       return {
@@ -61,6 +80,7 @@ export const loader = async ({ request }) => {
         code: discount.codes.nodes[0]?.code ?? discount.title,
         status: discount.status,
         customerName: discount.context?.customers?.[0]?.displayName ?? "Any customer",
+        customTiers: Boolean(node.codeTiers),
       };
     });
 
@@ -98,6 +118,7 @@ export default function Discounts() {
             <s-table-header-row>
               <s-table-header>Code</s-table-header>
               <s-table-header>Customer</s-table-header>
+              <s-table-header>Tiers</s-table-header>
               <s-table-header>Status</s-table-header>
             </s-table-header-row>
             <s-table-body>
@@ -122,6 +143,13 @@ export default function Discounts() {
                     </s-stack>
                   </s-table-cell>
                   <s-table-cell>{row.customerName}</s-table-cell>
+                  <s-table-cell>
+                    {row.customTiers ? (
+                      <s-badge tone="info">Custom</s-badge>
+                    ) : (
+                      "Default"
+                    )}
+                  </s-table-cell>
                   <s-table-cell>{row.status}</s-table-cell>
                 </s-table-row>
               ))}

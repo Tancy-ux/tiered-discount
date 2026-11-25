@@ -1,8 +1,23 @@
 query CartLinesDiscountsGenerateRunInput {
   discount {
     discountClasses
+    # Set by the app when a code is limited to customers: their customer GIDs,
+    # comma-separated. Empty/missing = anyone with the code.
+    customerLock: metafield(namespace: "tiered_discount", key: "customer_id") {
+      value
+    }
+    # Optional tiers for this code only, same JSON shape as the shop config.
+    # Missing = the code uses the shop's default tiers.
+    codeTiers: metafield(namespace: "tiered_discount", key: "tiers") {
+      value
+    }
   }
   cart {
+    buyerIdentity {
+      customer {
+        id
+      }
+    }
     cost {
       subtotalAmount {
         amount

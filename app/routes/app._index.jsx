@@ -4,6 +4,10 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { CustomerPicker } from "../components/CustomerPicker";
+import {
+  customerLockMetafields,
+  syncCustomerLocks,
+} from "../discount-metafields.server";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
 
@@ -20,15 +24,32 @@ function legacyId(gid) {
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
 
+  // Make sure older customer-specific codes carry the lock the Function checks.
+  try {
+    await syncCustomerLocks(admin);
+  } catch (error) {
+    console.error("Customer lock sync failed", error);
+  }
+
   const response = await admin.graphql(
     `#graphql
       query DiscountStats {
-        discountNodes(first: 50, query: "method:code type:app") {
+        currentAppInstallation {
+          app {
+            id
+          }
+        }
+        discountNodes(first: 100, query: "method:code type:app") {
           nodes {
             discount {
               __typename
               ... on DiscountCodeApp {
                 status
+                appDiscountType {
+                  app {
+                    id
+                  }
+                }
               }
             }
           }
@@ -43,8 +64,12 @@ export const loader = async ({ request }) => {
   );
   const { data } = await response.json();
 
+  // "type:app" also returns other apps' discounts; count only this app's codes.
+  const appId = data.currentAppInstallation.app.id;
   const codes = data.discountNodes.nodes.filter(
-    (node) => node.discount.__typename === "DiscountCodeApp",
+    (node) =>
+      node.discount.__typename === "DiscountCodeApp" &&
+      node.discount.appDiscountType?.app?.id === appId,
   );
 
   const tieredFunction =
@@ -99,7 +124,10 @@ export const action = async ({ request }) => {
           },
           startsAt: new Date().toISOString(),
           ...(customerId
-            ? { context: { customers: { add: [customerId] } } }
+            ? {
+                context: { customers: { add: [customerId] } },
+                metafields: customerLockMetafields(customerId),
+              }
             : {}),
         },
       },

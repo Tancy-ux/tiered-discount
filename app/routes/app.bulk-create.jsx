@@ -1,15 +1,34 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
+import { TierEditor, hasBadTiers } from "../components/TierEditor";
+import { DEFAULT_TIERS, readTiers, tiersForSubmit } from "../tiers";
+import {
+  cleanTiers,
+  codeTiersMetafields,
+} from "../discount-metafields.server";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
 const MAX_CODES_PER_SUBMIT = 100;
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-  return {};
+  const { admin } = await authenticate.admin(request);
+  const response = await admin.graphql(
+    `#graphql
+      query BulkCreateDefaults {
+        shop {
+          metafield(namespace: "tiered_discount", key: "config") {
+            value
+          }
+        }
+      }`,
+  );
+  const { data } = await response.json();
+  return {
+    defaultTiers: readTiers(data?.shop?.metafield?.value) ?? DEFAULT_TIERS,
+  };
 };
 
 export const action = async ({ request }) => {
@@ -29,6 +48,14 @@ export const action = async ({ request }) => {
 
   if (codes.length === 0) {
     return { ok: false, error: "Enter at least one code." };
+  }
+
+  // Optional: every code in this batch gets the same custom tiers.
+  let customTiers = null;
+  if (formData.get("useCustomTiers") === "true") {
+    const { tiers, error } = cleanTiers(formData.get("tiers")?.toString());
+    if (error) return { ok: false, error };
+    customTiers = tiers;
   }
 
   const results = [];
@@ -59,6 +86,9 @@ export const action = async ({ request }) => {
               shippingDiscounts: true,
             },
             startsAt: new Date().toISOString(),
+            ...(customTiers
+              ? { metafields: codeTiersMetafields(customTiers) }
+              : {}),
           },
         },
       },
@@ -73,13 +103,16 @@ export const action = async ({ request }) => {
     });
   }
 
-  return { ok: true, results };
+  return { ok: true, results, customTiers: Boolean(customTiers) };
 };
 
 export default function BulkCreate() {
+  const { defaultTiers } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [codesText, setCodesText] = useState("");
+  const [useCustomTiers, setUseCustomTiers] = useState(false);
+  const [tiers, setTiers] = useState(defaultTiers);
 
   const isSubmitting = fetcher.state !== "idle";
   const lineCount = codesText
@@ -91,10 +124,11 @@ export default function BulkCreate() {
     if (fetcher.data?.ok) {
       const succeeded = fetcher.data.results.filter((r) => r.ok).length;
       const failed = fetcher.data.results.length - succeeded;
+      const tierNote = fetcher.data.customTiers ? " with custom tiers" : "";
       shopify.toast.show(
         failed > 0
-          ? `Created ${succeeded} code(s), ${failed} failed`
-          : `Created ${succeeded} code(s)`,
+          ? `Created ${succeeded} code(s)${tierNote}, ${failed} failed`
+          : `Created ${succeeded} code(s)${tierNote}`,
       );
       if (failed === 0) {
         setCodesText("");
@@ -102,9 +136,18 @@ export default function BulkCreate() {
     }
   }, [fetcher.data, shopify]);
 
+  const tiersInvalid = useCustomTiers && hasBadTiers(tiers);
+
   const handleSubmit = () => {
-    if (!codesText.trim() || isSubmitting) return;
-    fetcher.submit({ codes: codesText }, { method: "post" });
+    if (!codesText.trim() || isSubmitting || tiersInvalid) return;
+    fetcher.submit(
+      {
+        codes: codesText,
+        useCustomTiers: String(useCustomTiers),
+        tiers: JSON.stringify(tiersForSubmit(tiers)),
+      },
+      { method: "post" },
+    );
   };
 
   return (
@@ -158,16 +201,45 @@ export default function BulkCreate() {
               ? ` — only the first ${MAX_CODES_PER_SUBMIT} will be created per submit`
               : ""}
           </s-text>
-
-          <s-button
-            variant="primary"
-            {...(!codesText.trim() || isSubmitting ? { disabled: true } : {})}
-            {...(isSubmitting ? { loading: true } : {})}
-            onClick={handleSubmit}
-          >
-            Create codes
-          </s-button>
         </s-stack>
+      </s-section>
+
+      <s-section heading="Discount tiers">
+        <s-stack direction="block" gap="base">
+          <s-checkbox
+            label="Use custom tiers for these codes"
+            details="Off: the codes use the default tiers and follow any later changes to them."
+            {...(useCustomTiers ? { checked: true } : {})}
+            onChange={(event) => setUseCustomTiers(event.currentTarget.checked)}
+          ></s-checkbox>
+
+          {useCustomTiers ? (
+            <>
+              <s-paragraph>
+                {"Every code in this batch gets these tiers. Changing the default tiers later won't affect them, and you can still change any one code from its own page."}
+              </s-paragraph>
+              <TierEditor tiers={tiers} onChange={setTiers} />
+            </>
+          ) : (
+            <>
+              <s-text color="subdued">Default tiers:</s-text>
+              <TierEditor tiers={defaultTiers} onChange={() => {}} disabled />
+            </>
+          )}
+        </s-stack>
+      </s-section>
+
+      <s-section>
+        <s-button
+          variant="primary"
+          {...(!codesText.trim() || isSubmitting || tiersInvalid
+            ? { disabled: true }
+            : {})}
+          {...(isSubmitting ? { loading: true } : {})}
+          onClick={handleSubmit}
+        >
+          {useCustomTiers ? "Create codes with custom tiers" : "Create codes"}
+        </s-button>
       </s-section>
     </s-page>
   );
