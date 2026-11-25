@@ -257,7 +257,9 @@ export const action = async ({ params, request }) => {
     }
     context = { customers };
   } else if (previousCustomerId) {
-    context = { customers: { remove: [previousCustomerId] } };
+    // Removing the only customer would leave an empty customer list, which
+    // Shopify rejects. Open the code to all buyers instead.
+    context = { all: "ALL" };
   }
 
   const response = await admin.graphql(
