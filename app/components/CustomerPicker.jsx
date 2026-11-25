@@ -28,8 +28,12 @@ export function CustomerPicker({ value, onChange, badge }) {
             {value.email && <s-text color="subdued">{value.email}</s-text>}
           </s-stack>
           {badge && <s-badge icon="lock">{badge}</s-badge>}
-          <s-button variant="tertiary" onClick={() => onChange(null)}>
-            Change
+          <s-button
+            variant="tertiary"
+            accessibilityLabel={`Remove ${value.displayName}`}
+            onClick={() => onChange(null)}
+          >
+            Remove
           </s-button>
         </s-stack>
       </s-box>

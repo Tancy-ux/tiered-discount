@@ -53,7 +53,9 @@ function readableDate(dateString) {
  */
 function buildCustomerMessage(saved) {
   if (!saved.customer) return null;
-  const firstName = (saved.customer.displayName ?? "").trim().split(/\s+/)[0];
+  // Customers saved without a name have their email as display name.
+  const firstWord = (saved.customer.displayName ?? "").trim().split(/\s+/)[0];
+  const firstName = firstWord.includes("@") ? "" : firstWord;
   const tiers = saved.customTiers ?? saved.defaultTiers;
   const where = saved.storeUrl
     ? `at ${saved.storeUrl.replace(/^https?:\/\//, "")}`
@@ -65,6 +67,45 @@ function buildCustomerMessage(saved) {
     }`,
     `Log in to your account ${where} before you check out. The code only works when you're logged in.`,
   ];
+}
+
+/**
+ * True only when this discount is a code made by THIS app. Every change
+ * checks it first, so a crafted request can never edit, pause or delete a
+ * discount made in Shopify admin or by another app.
+ */
+async function isOwnCode(admin, id) {
+  const response = await admin.graphql(
+    `#graphql
+      query CodeOwner($id: ID!) {
+        currentAppInstallation {
+          app {
+            id
+          }
+        }
+        discountNode(id: $id) {
+          discount {
+            __typename
+            ... on DiscountCodeApp {
+              appDiscountType {
+                app {
+                  id
+                }
+              }
+            }
+          }
+        }
+      }`,
+    { variables: { id: `gid://shopify/DiscountNode/${id}` } },
+  );
+  const { data } = await response.json();
+  const discount = data?.discountNode?.discount;
+  const appId = data?.currentAppInstallation?.app?.id;
+  return Boolean(
+    appId &&
+    discount?.__typename === "DiscountCodeApp" &&
+    discount.appDiscountType?.app?.id === appId,
+  );
 }
 
 async function loadShopTimeZone(admin) {
@@ -219,6 +260,14 @@ export const action = async ({ params, request }) => {
   const { id } = params;
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  if (!/^\d+$/.test(id ?? "") || !(await isOwnCode(admin, id))) {
+    return {
+      ok: false,
+      intent,
+      error: "This code wasn't made by this app, so it can't be changed here.",
+    };
+  }
 
   if (intent === "pause" || intent === "resume") {
     // Pausing ends the code now (Shopify keeps it); resuming makes it

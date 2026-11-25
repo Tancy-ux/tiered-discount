@@ -100,7 +100,8 @@ no manual price rule setup per order size.
   the code. Codes made before this existed get the lock automatically the next
   time the merchant opens the app's home page.
 - The app only lists, counts and edits its own codes. Discounts made by other
-  apps on the same store are never shown or changed.
+  apps on the same store are never shown or changed: every save, pause,
+  resume and delete first checks that the code was made by this app.
 
 ### Which tiers apply
 

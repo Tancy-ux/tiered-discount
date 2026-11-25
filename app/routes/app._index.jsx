@@ -6,7 +6,12 @@ import { authenticate } from "../shopify.server";
 import { TierSummary } from "../components/TierEditor";
 import { syncCustomerLocks } from "../discount-metafields.server";
 import { loadShop, saveOnboarding } from "../shop.server";
-import { formatMoney, statusBadge, tierForAmount } from "../tiers";
+import {
+  formatMoney,
+  statusBadge,
+  tierForAmount,
+  tiersForSubmit,
+} from "../tiers";
 
 function legacyId(gid) {
   return gid.split("/").pop();
@@ -179,7 +184,14 @@ export default function Home() {
     recentCodes,
     functionId,
   } = useLoaderData();
-  const [cartAmount, setCartAmount] = useState("75000");
+  // Start the cart check at the store's own second tier (its first amount
+  // above zero), so it suits any currency.
+  const [cartAmount, setCartAmount] = useState(() => {
+    const amounts = tiersForSubmit(defaultTiers)
+      .map((tier) => tier.minSubtotal)
+      .sort((a, b) => a - b);
+    return String(amounts.find((amount) => amount > 0) ?? amounts[0] ?? "");
+  });
   const check = tierForAmount(defaultTiers, cartAmount);
   const guideFetcher = useFetcher();
   const shopify = useAppBridge();
