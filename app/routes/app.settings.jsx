@@ -79,7 +79,7 @@ export default function Settings() {
       <s-section heading="Default tiers">
         <s-stack direction="block" gap="base">
           <s-paragraph>
-            {`Every code uses these tiers unless it has its own custom tiers. Changes apply at checkout straight away, to every code that uses the default tiers.`}
+            {`Every code uses these tiers unless it has its own custom tiers. Changes apply at checkout straight away, to every code that uses the default tiers. Amounts are in your store currency (${currencyCode}). Carts in other currencies are converted at checkout, so every buyer reaches the same tier.`}
           </s-paragraph>
 
           {!hasSavedTiers && (
@@ -90,7 +90,11 @@ export default function Settings() {
             </s-banner>
           )}
 
-          <TierEditor tiers={tiers} onChange={setTiers} />
+          <TierEditor
+            tiers={tiers}
+            onChange={setTiers}
+            currencyCode={currencyCode}
+          />
           {tiers.length === 0 && (
             <s-text color="subdued">Add at least one tier.</s-text>
           )}

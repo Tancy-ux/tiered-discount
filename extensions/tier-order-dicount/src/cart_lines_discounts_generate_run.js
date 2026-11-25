@@ -15,6 +15,8 @@
  *    but since this function only ever emits Order-class discounts and never
  *    checks `automaticDiscount`-only fields, it behaves correctly either way
  *    as long as you always create it as a code discount (see README).
+ *  - Tier thresholds are in the shop currency. Carts in another currency are
+ *    converted back with presentmentCurrencyRate before picking a tier.
  *  - Tier thresholds/percentages are read from a shop metafield so they can
  *    be changed later without redeploying the function. If the metafield is
  *    missing or malformed, we fall back to the thresholds from the brief.
@@ -55,7 +57,13 @@ export function cartLinesDiscountsGenerateRun(input) {
     }
   }
 
-  const subtotal = Number(input.cart.cost.subtotalAmount.amount);
+  // The subtotal is in the currency the buyer sees at checkout; tier amounts
+  // are in the shop currency. Convert back so every currency gets the same
+  // tier (presentment amount = shop amount × rate).
+  const rate = Number(input.presentmentCurrencyRate);
+  const subtotal =
+    Number(input.cart.cost.subtotalAmount.amount) /
+    (Number.isFinite(rate) && rate > 0 ? rate : 1);
   if (!Number.isFinite(subtotal)) {
     return { operations: [] };
   }

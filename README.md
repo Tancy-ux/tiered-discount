@@ -25,6 +25,19 @@ no manual price rule setup per order size.
 - **Large discounts need a confirmation:** saving any tier above 30% off
   (Settings, a code's custom tiers, or bulk create) asks the merchant to
   confirm first, to catch typos like 50 instead of 5.
+- **Tier checks:** a discount must be 0–100%, and no two tiers can use the
+  same cart subtotal (the field shows an error and saving is blocked).
+- **Currency:** tier amounts are in the store's currency, shown next to each
+  amount field. A buyer checking out in another currency is converted back
+  with Shopify's `presentmentCurrencyRate` before a tier is picked, so a
+  ₹50,000 tier is reached by the same cart value in USD, EUR, etc.
+- **Dates use the store's time zone.** A start date begins at 00:00 and an end
+  date lasts until 23:59:59 on that day, in the time zone set in the store's
+  Shopify settings. The end date can't be before the start date. Saving other
+  details on a code never moves its existing dates.
+- **Suggested codes:** picking a customer on the home page suggests a code
+  from the store's name and the customer's first name, e.g. "Ware
+  Innovations" + "Priya Shah" → `WARE-PRIYA`.
 - **Bulk create** works the same way: tick "Use custom tiers for these codes"
   and every code in that batch is created with those tiers. Left unticked,
   the codes use the default tiers.
@@ -47,6 +60,9 @@ For each checkout, the Function picks the first of these that's valid:
 1. The code's own tiers (`tiered_discount.tiers` on the discount)
 2. The shop's default tiers (`tiered_discount.config` on the shop)
 3. Built-in defaults: 5% below 50,000 · 7.5% from 50,000 · 10% from 3,00,000
+
+It then compares the cart subtotal, converted to the store currency, with
+those tiers and uses the highest one reached.
 
 A tier list that's missing, empty or broken is skipped, and any single tier
 with a discount above 100% is ignored, so a bad value never breaks checkout.
@@ -123,6 +139,17 @@ Merchants on other stores keep their own default tiers and codes when the app
 is updated: codes without `tiered_discount.tiers` behave exactly as before.
 The one behaviour change from the customer lock is that customer-specific
 codes now require that customer to be logged in.
+
+Behaviour changes in the next release:
+
+- **Currency (needs `npm run deploy`):** buyers paying in a currency other
+  than the store's are now converted to the store currency before a tier is
+  picked. Before, their subtotal was compared as-is, so they could land in
+  the wrong tier. Stores selling only in their own currency see no change.
+- **End dates:** codes saved before this release ended at 00:00 UTC on their
+  end date. A code whose dates are changed and saved now runs to the end of
+  that day in the store's time zone. Codes that aren't re-saved keep their
+  old end time.
 
 ## Tech stack
 

@@ -24,6 +24,7 @@ export const loader = async ({ request }) => {
     `#graphql
       query BulkCreateDefaults {
         shop {
+          currencyCode
           metafield(namespace: "tiered_discount", key: "config") {
             value
           }
@@ -33,6 +34,7 @@ export const loader = async ({ request }) => {
   const { data } = await response.json();
   return {
     defaultTiers: readTiers(data?.shop?.metafield?.value) ?? DEFAULT_TIERS,
+    currencyCode: data?.shop?.currencyCode,
   };
 };
 
@@ -112,7 +114,7 @@ export const action = async ({ request }) => {
 };
 
 export default function BulkCreate() {
-  const { defaultTiers } = useLoaderData();
+  const { defaultTiers, currencyCode } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [codesText, setCodesText] = useState("");
@@ -224,12 +226,21 @@ export default function BulkCreate() {
               <s-paragraph>
                 {"Every code in this batch gets these tiers. Changing the default tiers later won't affect them, and you can still change any one code from its own page."}
               </s-paragraph>
-              <TierEditor tiers={tiers} onChange={setTiers} />
+              <TierEditor
+                tiers={tiers}
+                onChange={setTiers}
+                currencyCode={currencyCode}
+              />
             </>
           ) : (
             <>
               <s-text color="subdued">Default tiers:</s-text>
-              <TierEditor tiers={defaultTiers} onChange={() => {}} disabled />
+              <TierEditor
+                tiers={defaultTiers}
+                onChange={() => {}}
+                disabled
+                currencyCode={currencyCode}
+              />
             </>
           )}
         </s-stack>

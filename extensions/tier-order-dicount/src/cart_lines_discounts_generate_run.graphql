@@ -1,4 +1,6 @@
 query CartLinesDiscountsGenerateRunInput {
+  # Shop currency → checkout currency. Tier amounts are in the shop currency.
+  presentmentCurrencyRate
   discount {
     discountClasses
     # Set by the app when a code is limited to customers: their customer GIDs,

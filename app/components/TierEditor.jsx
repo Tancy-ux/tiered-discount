@@ -25,7 +25,11 @@ export function hasBadTiers(tiers) {
   );
 }
 
-export function TierEditor({ tiers, onChange, disabled = false }) {
+export function TierEditor({ tiers, onChange, disabled = false, currencyCode }) {
+  const amountLabel = currencyCode
+    ? `Cart subtotal at or above (${currencyCode})`
+    : "Cart subtotal at or above";
+
   const handleTierChange = (index, field, value) => {
     onChange(
       tiers.map((tier, i) => (i === index ? { ...tier, [field]: value } : tier)),
@@ -45,7 +49,7 @@ export function TierEditor({ tiers, onChange, disabled = false }) {
       {tiers.map((tier, index) => (
         <s-stack direction="inline" gap="base" alignItems="end" key={index}>
           <s-number-field
-            label="Cart subtotal at or above"
+            label={amountLabel}
             min={0}
             {...(disabled ? { disabled: true } : {})}
             {...(!disabled && isDuplicateSubtotal(tiers, index)

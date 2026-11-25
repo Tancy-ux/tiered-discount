@@ -93,6 +93,7 @@ export const loader = async ({ params, request }) => {
         shop {
           id
           ianaTimezone
+          currencyCode
           metafield(namespace: "tiered_discount", key: "config") {
             id
             value
@@ -139,6 +140,7 @@ export const loader = async ({ params, request }) => {
     appliesOncePerCustomer: discount.appliesOncePerCustomer,
     customer,
     defaultTiers,
+    currencyCode: data.shop.currencyCode,
     customTiers,
     notes: data.discountNode.notesMetafield?.value ?? "",
   };
@@ -564,6 +566,7 @@ export default function DiscountDetail() {
               <TierEditor
                 tiers={customTiersDraft}
                 onChange={setCustomTiersDraft}
+                currencyCode={loaderData.currencyCode}
               />
               {customTiersDraft.length === 0 && (
                 <s-text color="subdued">Add at least one tier.</s-text>
@@ -580,6 +583,7 @@ export default function DiscountDetail() {
                 tiers={loaderData.defaultTiers}
                 onChange={() => {}}
                 disabled
+                currencyCode={loaderData.currencyCode}
               />
               <s-link href="/app/settings">
                 Change default tiers in Settings
