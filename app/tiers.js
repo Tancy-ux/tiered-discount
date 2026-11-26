@@ -40,13 +40,17 @@ export function tiersForSubmit(tiers) {
  */
 export function formatMoney(amount, currencyCode) {
   const number = Number(amount) || 0;
+  // Whole amounts without decimals (₹5,000); anything else with two (₹99.90),
+  // never one.
+  const rounded = Math.round(number * 100) / 100;
+  const digits = Number.isInteger(rounded) ? 0 : 2;
   try {
     return new Intl.NumberFormat(currencyCode === "INR" ? "en-IN" : "en-US", {
       style: "currency",
       currency: currencyCode || "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(number);
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(rounded);
   } catch {
     return `${currencyCode ?? ""} ${number}`.trim();
   }

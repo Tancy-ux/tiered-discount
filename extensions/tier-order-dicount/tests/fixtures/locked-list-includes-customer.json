@@ -3,29 +3,40 @@
     "export": "cart-lines-discounts-generate-run",
     "target": "cart.lines.discounts.generate.run",
     "input": {
-      "cart": {
-        "lines": [
-          {
-            "id": "gid://shopify/CartLine/0",
-            "cost": {
-              "subtotalAmount": {
-                "amount": "100.0"
-              }
-            }
-          }
-        ]
-      },
+      "presentmentCurrencyRate": "1.0",
       "discount": {
-        "discountClasses": ["ORDER"]
+        "discountClasses": [
+          "ORDER"
+        ],
+        "customerLock": {
+          "value": "gid://shopify/Customer/1002, gid://shopify/Customer/1001"
+        },
+        "codeTiers": null
+      },
+      "cart": {
+        "buyerIdentity": {
+          "customer": {
+            "id": "gid://shopify/Customer/1001"
+          }
+        },
+        "cost": {
+          "subtotalAmount": {
+            "amount": "10000.0"
+          }
+        }
+      },
+      "shop": {
+        "metafield": null
       }
     },
     "output": {
       "operations": [
         {
           "orderDiscountsAdd": {
+            "selectionStrategy": "FIRST",
             "candidates": [
               {
-                "message": "10% OFF ORDER",
+                "message": "5% off your order",
                 "targets": [
                   {
                     "orderSubtotal": {
@@ -35,12 +46,11 @@
                 ],
                 "value": {
                   "percentage": {
-                    "value": 10.0
+                    "value": "5"
                   }
                 }
               }
-            ],
-            "selectionStrategy": "FIRST"
+            ]
           }
         }
       ]

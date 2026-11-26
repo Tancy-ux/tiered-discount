@@ -17,6 +17,9 @@ function legacyId(gid) {
   return gid.split("/").pop();
 }
 
+// Largest cart amount the home page checker accepts; keeps the result readable.
+const MAX_CART_CHECK = 100000000;
+
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
 
@@ -185,10 +188,13 @@ export default function Home() {
   });
   const cartValue = String(cartAmount ?? "").trim();
   const cartNumber = Number(cartValue);
-  const cartError =
-    cartValue && (!Number.isFinite(cartNumber) || cartNumber < 0)
+  const cartError = !cartValue
+    ? null
+    : !Number.isFinite(cartNumber) || cartNumber < 0
       ? "Enter 0 or more"
-      : null;
+      : cartNumber > MAX_CART_CHECK
+        ? `Enter ${formatMoney(MAX_CART_CHECK, currencyCode)} or less`
+        : null;
   // Nothing to say until a valid amount is typed.
   const check =
     cartValue && !cartError ? tierForAmount(defaultTiers, cartNumber) : null;
@@ -201,7 +207,7 @@ export default function Home() {
     }
   }, [guideFetcher.data, shopify]);
 
-  const createHref = functionId ? `/app/discount/${functionId}/new` : null;
+  const createHref = functionId ? `/app/discounts/${functionId}/new` : null;
   const steps = [hasSavedTiers, totalCodes > 0, onboarding.tested];
   const doneCount = steps.filter(Boolean).length;
   const showGuide = !onboarding.dismissed && doneCount < steps.length;
@@ -312,6 +318,7 @@ export default function Home() {
             <s-number-field
               label="Check a cart amount"
               min={0}
+              max={MAX_CART_CHECK}
               prefix={currencyCode}
               {...(cartError ? { error: cartError } : {})}
               value={cartAmount}
@@ -356,7 +363,7 @@ export default function Home() {
                       <s-table-cell>
                         {functionId ? (
                           <s-link
-                            href={`/app/discount/${functionId}/${row.id}`}
+                            href={`/app/discounts/${functionId}/${row.id}`}
                           >
                             {row.code}
                           </s-link>

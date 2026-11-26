@@ -1,0 +1,36 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "presentmentCurrencyRate": "1.0",
+      "discount": {
+        "discountClasses": [
+          "ORDER"
+        ],
+        "customerLock": {
+          "value": "gid://shopify/Customer/1001"
+        },
+        "codeTiers": null
+      },
+      "cart": {
+        "buyerIdentity": {
+          "customer": {
+            "id": "gid://shopify/Customer/1002"
+          }
+        },
+        "cost": {
+          "subtotalAmount": {
+            "amount": "10000.0"
+          }
+        }
+      },
+      "shop": {
+        "metafield": null
+      }
+    },
+    "output": {
+      "operations": []
+    }
+  }
+}

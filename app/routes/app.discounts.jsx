@@ -195,7 +195,7 @@ export default function Discounts() {
         <s-button
           slot="primary-action"
           variant="primary"
-          href={`/app/discount/${functionId}/new`}
+          href={`/app/discounts/${functionId}/new`}
         >
           Create code
         </s-button>
@@ -262,7 +262,7 @@ export default function Discounts() {
                         >
                           {functionId ? (
                             <s-link
-                              href={`/app/discount/${functionId}/${row.id}`}
+                              href={`/app/discounts/${functionId}/${row.id}`}
                             >
                               {row.code}
                             </s-link>

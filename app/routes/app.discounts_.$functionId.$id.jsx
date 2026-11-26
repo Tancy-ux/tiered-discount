@@ -819,6 +819,18 @@ export default function DiscountDetail() {
 
       <s-section heading="Code">
         <s-stack direction="block" gap="base">
+          <s-stack direction="block" gap="small-300">
+            <CustomerPicker
+              value={customer}
+              onChange={setCustomer}
+              badge="Logged-in only"
+            />
+            <s-text color="subdued">
+              {customer
+                ? `Only ${customer.displayName} can use this code, and only while logged in.`
+                : "Anyone with the code can use it. Pick a customer to make it theirs only."}
+            </s-text>
+          </s-stack>
           <s-text-field
             label="Discount code"
             details="Letters, numbers, - and _ only. Saved in capitals."
@@ -836,18 +848,6 @@ export default function DiscountDetail() {
               accessibilityLabel="Copy code"
             ></s-button>
           </s-text-field>
-          <s-stack direction="block" gap="small-300">
-            <CustomerPicker
-              value={customer}
-              onChange={setCustomer}
-              badge="Logged-in only"
-            />
-            <s-text color="subdued">
-              {customer
-                ? `Only ${customer.displayName} can use this code, and only while logged in.`
-                : "Anyone with the code can use it. Pick a customer to make it theirs only."}
-            </s-text>
-          </s-stack>
         </s-stack>
       </s-section>
 

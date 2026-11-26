@@ -88,16 +88,24 @@ export function DatesSection({
   return (
     <s-section heading="Active dates">
       <s-stack direction="block" gap="base">
+        {/* Shown above the fields: the date picker opens below a field and
+            would cover a message placed under it. */}
+        {(problems.start || problems.end) && (
+          <s-banner tone="critical">
+            <s-stack direction="block" gap="small-300">
+              {problems.start && <s-text>{`${problems.start}.`}</s-text>}
+              {problems.end && <s-text>{`${problems.end}.`}</s-text>}
+            </s-stack>
+          </s-banner>
+        )}
         <s-stack direction="block" gap="base">
           <s-date-field
             label="Start date"
-            {...(problems.start ? { error: problems.start } : {})}
             value={startsAt}
             onChange={(event) => onStartsAtChange(event.currentTarget.value)}
           ></s-date-field>
           <s-date-field
             label="End date (optional)"
-            {...(problems.end ? { error: problems.end } : {})}
             value={endsAt}
             onChange={(event) => onEndsAtChange(event.currentTarget.value)}
           ></s-date-field>

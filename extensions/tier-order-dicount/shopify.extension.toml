@@ -20,5 +20,5 @@ command = ""
 path = "dist/function.wasm"
 
 [extensions.ui.paths]
-create = "/app/discount/:functionId/new"
-details = "/app/discount/:functionId/:id"
+create = "/app/discounts/:functionId/new"
+details = "/app/discounts/:functionId/:id"

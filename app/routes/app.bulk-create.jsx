@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
+import { SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { TierEditor, TierSummary, hasBadTiers } from "../components/TierEditor";
@@ -183,12 +183,20 @@ export default function BulkCreate() {
     const succeeded = fetcher.data.results.filter((r) => r.ok).length;
     const failed = fetcher.data.results.length - succeeded;
     const tierNote = fetcher.data.customTiers ? " with custom tiers" : "";
-    shopify.toast.show(
-      failed > 0
-        ? `Created ${succeeded} code(s)${tierNote}, ${failed} not created`
-        : `Created ${succeeded} code(s)${tierNote}`,
-    );
-    if (failed === 0) setCodesText("");
+    if (succeeded === 0) {
+      shopify.toast.show(
+        failed === 1 ? "The code wasn't created" : "No codes were created",
+        { isError: true },
+      );
+    } else {
+      shopify.toast.show(
+        failed > 0
+          ? `Created ${succeeded} code(s)${tierNote}, ${failed} not created`
+          : `Created ${succeeded} code(s)${tierNote}`,
+      );
+    }
+    if (failed === 0) handleDiscard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetcher.data, shopify]);
 
   const dateProblems = datesProblems(startsAt, endsAt);
@@ -225,6 +233,30 @@ export default function BulkCreate() {
     );
   };
 
+  // Anything typed or changed counts as unsaved work.
+  const hasEntries =
+    Boolean(codesText.trim()) ||
+    useCustomTiers ||
+    startsAt !== today ||
+    Boolean(endsAt) ||
+    Boolean(String(usageLimit).trim()) ||
+    appliesOncePerCustomer ||
+    combines.order !== DEFAULT_COMBINES.order ||
+    combines.product !== DEFAULT_COMBINES.product ||
+    combines.shipping !== DEFAULT_COMBINES.shipping ||
+    Boolean(notes.trim());
+  const handleDiscard = () => {
+    setCodesText("");
+    setUseCustomTiers(false);
+    setTiers(defaultTiers);
+    setStartsAt(today);
+    setEndsAt("");
+    setUsageLimit("");
+    setAppliesOncePerCustomer(false);
+    setCombines(DEFAULT_COMBINES);
+    setNotes("");
+  };
+
   const alreadyExisting = parsed.codes.filter((code) => existing.has(code));
   const hasProblems =
     parsed.invalid.length > 0 ||
@@ -234,6 +266,20 @@ export default function BulkCreate() {
 
   return (
     <s-page heading="Bulk create discount codes">
+      {/* Shopify's save bar: shows while there are unsaved changes, and the
+          admin asks before leaving the page while it's open. */}
+      <SaveBar id="bulk-save-bar" open={hasEntries}>
+        <button
+          variant="primary"
+          {...(isSubmitting ? { loading: "" } : {})}
+          {...(canSave ? {} : { disabled: true })}
+          onClick={() => handleSave()}
+        >
+          Create codes
+        </button>
+        <button onClick={handleDiscard}>Discard</button>
+      </SaveBar>
+
       <s-link slot="breadcrumb-actions" href="/app/discounts">
         Discount codes
       </s-link>
@@ -270,7 +316,14 @@ export default function BulkCreate() {
       )}
 
       {fetcher.data?.ok && fetcher.data.results.some((r) => !r.ok) && (
-        <s-banner tone="warning" heading="Some codes weren't created">
+        <s-banner
+          tone="warning"
+          heading={
+            fetcher.data.results.some((r) => r.ok)
+              ? "Some codes weren't created"
+              : "No codes were created"
+          }
+        >
           <s-stack direction="block" gap="small-300">
             {fetcher.data.results
               .filter((r) => !r.ok)

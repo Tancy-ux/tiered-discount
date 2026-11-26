@@ -214,7 +214,7 @@ export default function NewDiscount() {
   useEffect(() => {
     if (fetcher.data?.ok) {
       shopify.toast.show("Discount code created");
-      navigate(`/app/discount/${functionId}/${fetcher.data.id}`);
+      navigate(`/app/discounts/${functionId}/${fetcher.data.id}`);
     }
   }, [fetcher.data, shopify, navigate, functionId]);
 

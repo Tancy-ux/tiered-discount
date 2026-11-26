@@ -1,0 +1,53 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "presentmentCurrencyRate": "0.5",
+      "discount": {
+        "discountClasses": [
+          "ORDER"
+        ],
+        "customerLock": null,
+        "codeTiers": null
+      },
+      "cart": {
+        "buyerIdentity": null,
+        "cost": {
+          "subtotalAmount": {
+            "amount": "25000.0"
+          }
+        }
+      },
+      "shop": {
+        "metafield": null
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "orderDiscountsAdd": {
+            "selectionStrategy": "FIRST",
+            "candidates": [
+              {
+                "message": "7.5% off your order",
+                "targets": [
+                  {
+                    "orderSubtotal": {
+                      "excludedCartLineIds": []
+                    }
+                  }
+                ],
+                "value": {
+                  "percentage": {
+                    "value": "7.5"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -80,7 +80,7 @@ no manual price rule setup per order size.
   store are listed with the reason and left out, so "X codes ready" is exact
   (up to 100 per batch). The batch shares custom or default tiers, start/end
   dates, total uses, one use per customer, combinations and notes.
-- **Create code page** (`/app/discount/:functionId/new`, also opened by
+- **Create code page** (`/app/discounts/:functionId/new`, also opened by
   Shopify's Discounts > Create discount): everything is set in one step:
   customer (optional; leave empty for anyone with the code), code, custom or
   default tiers, start/end dates, total uses, one use per customer,
