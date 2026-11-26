@@ -98,7 +98,8 @@ export function DatesSection({
             </s-stack>
           </s-banner>
         )}
-        <s-stack direction="block" gap="base">
+        {/* Start and end side by side, each taking half the width. */}
+        <s-grid gridTemplateColumns="1fr 1fr" gap="base">
           <s-date-field
             label="Start date"
             value={startsAt}
@@ -109,7 +110,7 @@ export function DatesSection({
             value={endsAt}
             onChange={(event) => onEndsAtChange(event.currentTarget.value)}
           ></s-date-field>
-        </s-stack>
+        </s-grid>
         <s-text color="subdued">
           Dates use your store&apos;s time zone. The code works until the end of
           its end date.
