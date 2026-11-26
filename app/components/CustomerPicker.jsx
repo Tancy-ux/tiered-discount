@@ -53,9 +53,11 @@ export function CustomerPicker({ value, onChange, badge }) {
           {searchResults.length === 0 ? (
             <s-box padding="base">
               <s-text color="subdued">
-                {searchFetcher.state === "idle"
-                  ? "No matching customers"
-                  : "Searching…"}
+                {searchFetcher.state !== "idle"
+                  ? "Searching…"
+                  : searchFetcher.data?.error
+                    ? "Couldn't search customers. Try again."
+                    : "No matching customers"}
               </s-text>
             </s-box>
           ) : (

@@ -129,6 +129,8 @@ async function loadShopTimeZone(admin) {
 export const loader = async ({ params, request }) => {
   const { admin } = await authenticate.admin(request);
   const { id } = params;
+  // A mistyped or edited link: show "not found" instead of an error.
+  if (!/^\d+$/.test(id ?? "")) return { notFound: true };
 
   const response = await admin.graphql(
     `#graphql

@@ -10,6 +10,17 @@ export const loader = async ({ request }) => {
     return { customers: [] };
   }
 
+  // A failed search (e.g. Shopify refusing customer data) must only affect
+  // the search box, never take the whole page down.
+  try {
+    return await searchCustomers(admin, term);
+  } catch (error) {
+    console.error("Customer search failed", error);
+    return { customers: [], error: true };
+  }
+};
+
+async function searchCustomers(admin, term) {
   const response = await admin.graphql(
     `#graphql
       query SearchCustomers($query: String!) {
@@ -26,6 +37,7 @@ export const loader = async ({ request }) => {
     { variables: { query: term } },
   );
   const { data } = await response.json();
+  if (!data?.customers) return { customers: [], error: true };
 
   return {
     customers: data.customers.nodes.map((customer) => ({
@@ -34,4 +46,4 @@ export const loader = async ({ request }) => {
       email: customer.defaultEmailAddress?.emailAddress ?? null,
     })),
   };
-};
+}

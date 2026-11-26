@@ -24,13 +24,13 @@ export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
 
   // Make sure older customer-specific codes carry the lock the Function checks.
-  try {
-    await syncCustomerLocks(admin);
-  } catch (error) {
+  // Runs in the background so Home doesn't wait for it; it only writes
+  // missing locks and nothing below depends on it.
+  syncCustomerLocks(admin).catch((error) => {
     console.error("Customer lock sync failed", error);
-  }
+  });
 
-  const response = await admin.graphql(
+  const statsRequest = admin.graphql(
     `#graphql
       query DiscountStats {
         currentAppInstallation {
@@ -79,6 +79,7 @@ export const loader = async ({ request }) => {
         }
       }`,
   );
+  const [response, shop] = await Promise.all([statsRequest, loadShop(admin)]);
   const { data } = await response.json();
 
   // "type:app" also returns other apps' discounts; count only this app's codes.
@@ -95,8 +96,6 @@ export const loader = async ({ request }) => {
     data.shopifyFunctions.nodes.find(
       (node) => node.title === "Tiered order discount",
     ) ?? data.shopifyFunctions.nodes[0];
-
-  const shop = await loadShop(admin);
 
   return {
     defaultTiers: shop.defaultTiers,
