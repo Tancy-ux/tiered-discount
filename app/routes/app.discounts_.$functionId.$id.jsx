@@ -23,7 +23,6 @@ import {
   DEFAULT_TIERS,
   hasLargeDiscount,
   largeDiscountText,
-  describeTiers,
   readTiers,
   statusBadge,
   tiersForSubmit,
@@ -39,40 +38,7 @@ import { copyText } from "../clipboard";
 import { codeFormatError, normalizeCode } from "../codes";
 import { findExistingCodes } from "../code-lookup.server";
 import { useCodeTaken } from "../components/useCodeTaken";
-
-/** "2026-12-31" → "31 Dec 2026" */
-function readableDate(dateString) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-}
-
-/**
- * Ready-to-send message for a customer-specific code, from the SAVED code
- * (so it never describes unsaved edits). null for codes open to anyone.
- * @returns {string[] | null} paragraphs
- */
-function buildCustomerMessage(saved) {
-  if (!saved.customer) return null;
-  // Customers saved without a name have their email as display name.
-  const firstWord = (saved.customer.displayName ?? "").trim().split(/\s+/)[0];
-  const firstName = firstWord.includes("@") ? "" : firstWord;
-  const tiers = saved.customTiers ?? saved.defaultTiers;
-  const where = saved.storeUrl
-    ? `at ${saved.storeUrl.replace(/^https?:\/\//, "")}`
-    : "on our store";
-  return [
-    `Hi${firstName ? ` ${firstName}` : ""}, here's your personal discount code: ${saved.code}`,
-    `Your discount: ${describeTiers(tiers, saved.currencyCode)}.${
-      saved.endsAt ? ` Valid until ${readableDate(saved.endsAt)}.` : ""
-    }`,
-    `Log in to your account ${where} before you check out. The code only works when you're logged in.`,
-  ];
-}
+import { buildCustomerMessage } from "../customer-message";
 
 /**
  * True only when this discount is a code made by THIS app. Every change

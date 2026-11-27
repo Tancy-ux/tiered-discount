@@ -36,6 +36,8 @@ import { codeFormatError, normalizeCode } from "../codes";
 import { findExistingCodes } from "../code-lookup.server";
 import { useCodeTaken } from "../components/useCodeTaken";
 import { isoToShopDate, shopDateToIso } from "../dates";
+import { copyText } from "../clipboard";
+import { buildCustomerMessage } from "../customer-message";
 
 const FUNCTION_HANDLE = "tiered-order-discount";
 
@@ -53,6 +55,7 @@ export const loader = async ({ request }) => {
     defaultTiers: shop.defaultTiers,
     currencyCode: shop.currencyCode,
     codePrefix: shop.codePrefix,
+    storeUrl: shop.storeUrl,
     // Today in the shop's time zone, the default start date.
     today: isoToShopDate(new Date().toISOString(), shop.timeZone),
   };
@@ -164,7 +167,8 @@ export const action = async ({ request }) => {
 };
 
 export default function NewDiscount() {
-  const { defaultTiers, currencyCode, codePrefix, today } = useLoaderData();
+  const { defaultTiers, currencyCode, codePrefix, storeUrl, today } =
+    useLoaderData();
   const { functionId } = useParams();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -243,6 +247,25 @@ export default function NewDiscount() {
     // Suggest a code until the merchant types their own.
     if (picked && !code.trim())
       setCode(suggestCode(codePrefix, picked.displayName));
+  };
+
+  // Live preview of the message for the chosen customer, from what's entered.
+  const customerMessage = buildCustomerMessage({
+    customer,
+    code: normalizedCode || "YOURCODE",
+    // Custom tiers as typed, so the preview always matches the screen.
+    customTiers: useCustomTiers && tiers.length > 0 ? tiers : null,
+    defaultTiers,
+    currencyCode,
+    endsAt,
+    storeUrl,
+  });
+  const handleCopyMessage = async () => {
+    if (await copyText(customerMessage.join("\n\n"))) {
+      shopify.toast.show("Message copied");
+    } else {
+      shopify.toast.show("Couldn't copy message", { isError: true });
+    }
   };
 
   const [confirmingLarge, setConfirmingLarge] = useState(false);
@@ -380,6 +403,38 @@ export default function NewDiscount() {
         notes={notes}
         onNotesChange={setNotes}
       />
+
+      {/* For a customer-only code: the message to send them, updated live. */}
+      {customerMessage && (
+        <s-section slot="aside" heading="Send to customer">
+          <s-stack direction="block" gap="base">
+            <s-text color="subdued">
+              A ready-made message to paste into email, SMS or WhatsApp. The
+              code only works once you click Create code.
+            </s-text>
+            <s-box
+              padding="small-200 base"
+              background="subdued"
+              borderRadius="base"
+            >
+              <s-stack direction="block" gap="small-200">
+                {customerMessage.map((line) => (
+                  <s-text key={line}>{line}</s-text>
+                ))}
+              </s-stack>
+            </s-box>
+            <s-stack direction="inline">
+              <s-button
+                icon="clipboard"
+                {...(normalizedCode && !codeError ? {} : { disabled: true })}
+                onClick={handleCopyMessage}
+              >
+                Copy message
+              </s-button>
+            </s-stack>
+          </s-stack>
+        </s-section>
+      )}
     </s-page>
   );
 }
