@@ -112,8 +112,9 @@ export function DatesSection({
           ></s-date-field>
         </s-grid>
         <s-text color="subdued">
-          Dates use your store&apos;s time zone. The code works until the end of
-          its end date.
+          Dates use your store&apos;s time zone (Settings → General). Codes
+          start at 00:00 on the start date and work until 23:59 on the end
+          date.
         </s-text>
       </s-stack>
     </s-section>
@@ -131,6 +132,7 @@ export function CombinesSection({ combines, onCombinesChange, slot }) {
 /** Usage limits, combinations and notes, shown open in one section. */
 export function MoreSettingsSection({
   usageLimit,
+  usageLimitDetails,
   onUsageLimitChange,
   appliesOncePerCustomer,
   onAppliesOncePerCustomerChange,
@@ -149,6 +151,7 @@ export function MoreSettingsSection({
           placeholder="Unlimited"
           min={1}
           step={1}
+          {...(usageLimitDetails ? { details: usageLimitDetails } : {})}
           {...(problem ? { error: problem } : {})}
           value={String(usageLimit ?? "")}
           onInput={(event) => onUsageLimitChange(event.currentTarget.value)}

@@ -436,6 +436,7 @@ export default function BulkCreate() {
       <MoreSettingsSection
         slot="aside"
         usageLimit={usageLimit}
+        usageLimitDetails="Counted for each code separately. Enter 1 to make every code single-use."
         onUsageLimitChange={setUsageLimit}
         appliesOncePerCustomer={appliesOncePerCustomer}
         onAppliesOncePerCustomerChange={setAppliesOncePerCustomer}
